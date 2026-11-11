@@ -26,10 +26,10 @@ A working app and backend, deployed from one Claude Code session:
 | 4 | Balances simplified and correct | **Pass** | The minimum number of transfers is proven against brute force; seeded balances match hand calculation to the paisa. |
 | 5 | Scan bill, assign items, create expense | **Partly verified** | Upload, type and size validation, and the manual fallback are tested. Automatic reading needs `OCR_SPACE_API_KEY` (owner action). The parser is tested on a sample Indian bill. |
 | 6 | Pay via UPI opens a UPI app on Android | **Needs a phone** | Built (`upi://pay` link, Android manifest query for UPI apps). Must be tried on a real Android phone. |
-| 7 | Receiver gets in-app message and email; debt clears only on confirm | **In-app: pass. Email: blocked** | In-app message and confirm-only clearing pass end to end. Email is blocked until `RESEND_API_KEY` is saved as an Edge Function secret. |
+| 7 | Receiver gets in-app message and email; debt clears only on confirm | **Pass** | In-app message and confirm-only clearing pass end to end. Email delivery through Resend confirmed with a live test send. |
 | 8 | Declined or abandoned payment keeps the debt; can retry | **Pass** | End to end: decline, debt intact, retry, confirm. |
 | 9 | Cash settlement needs recipient confirmation | **Pass** | End to end. |
-| 10 | Automated reminder for debts older than 3 days | **Pass (in-app)** | pg_cron is scheduled for 09:00 IST. Fired through the same path, it sent 6 reminders and 1 confirm nudge with no human action. Emails wait on the Resend key. |
+| 10 | Automated reminder for debts older than 3 days | **Pass** | pg_cron is scheduled for 09:00 IST. Fired through the same path, it sent 6 reminders and 1 confirm nudge with no human action. Reminder emails use the same, now-working email path; demo accounts use example.com addresses, so they don't receive them. |
 | 11 | Works offline, syncs on reconnect | **Pass (web); native needs a phone** | Offline add, banner, queue persistence and sync on reconnect pass end to end. A force-close while offline is covered by a unit test; on a phone it needs a device check. |
 | 12 | Cannot reach another group's data by URL or API | **Pass** | 43 database checks (an outsider's reads and writes, member versus admin, payer versus receiver, anonymous access) plus API and URL tests. |
 | 13 | Forced crash appears in error reporting | **Blocked on owner** | Sentry is wired in the app and the backend, with a test-crash button in Profile. Needs the Sentry DSN. |
