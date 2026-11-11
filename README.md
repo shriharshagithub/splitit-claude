@@ -26,7 +26,7 @@ Demo accounts (password `SplitIt@2026` for all):
 | Arjun Mehta | 99000 45678 | Goa Trip, Flat 402 |
 | Meera Nair | 98111 22334 | Goa Trip |
 
-Demo accounts use `@example.com` addresses, so they never receive email. Sign up with your own email to test password reset and payment emails.
+Demo accounts use `@example.com` addresses, so they never receive email, and `@example` UPI IDs, which no UPI app accepts, so a test payment can never reach a real person. To try a real UPI payment, put your own UPI ID on your own account and pay ₹1 from someone else's phone. Sign up with your own email to test password reset and payment emails.
 
 ## How it works
 

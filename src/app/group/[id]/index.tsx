@@ -1,12 +1,14 @@
 import { useMutation } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Camera, Clock, Plus, Settings } from 'lucide-react-native';
+import { Camera, Clock, Plus, Settings, UserPlus } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, ScrollView, View } from 'react-native';
 import { Avatar, Button, Card, ErrorView, IconButton, Loading, Money, Pill, Row, Screen, Segmented, T } from '@/components/ui';
 import { formatINR } from '@/core';
-import { requestPayment } from '@/lib/api';
-import { useMe } from '@/lib/auth';
+import { getGroupInviteLink, requestPayment } from '@/lib/api';
+import { useAuth, useMe } from '@/lib/auth';
+import { inviteLink } from '@/lib/links';
+import { shareText } from '@/lib/share';
 import { errText } from '@/lib/errors';
 import { useExpenseFeed, useGroup, useOpenSettlements, useTransfers } from '@/lib/hooks';
 import { useSync } from '@/lib/offline';
@@ -22,6 +24,7 @@ export default function GroupDetail() {
   const { id, tab: initialTab } = useLocalSearchParams<{ id: string; tab?: 'expenses' | 'balances' }>();
   const c = useColors();
   const me = useMe();
+  const { profile } = useAuth();
   const [tab, setTab] = useState<'expenses' | 'balances'>(initialTab ?? 'expenses');
   const group = useGroup(id);
   const { transfers, nets, error: netsErr, refetch: refetchNets } = useTransfers(id);
@@ -41,6 +44,16 @@ export default function GroupDetail() {
     onError: (e) => setMsg(errText(e)),
   });
 
+  const invite = useMutation({
+    mutationFn: async () => {
+      const token = await getGroupInviteLink(id);
+      const g = group.data!;
+      return shareText(`${profile?.full_name?.split(' ')[0] ?? 'A friend'} invited you to "${g.name}" on SplitIt, to split expenses and settle up over UPI. Join here: ${inviteLink(token)}`);
+    },
+    onSuccess: (r) => setMsg(r === 'copied' ? 'Invite link copied. Paste it into WhatsApp or SMS.' : 'Invite link shared.'),
+    onError: (e) => setMsg(errText(e)),
+  });
+
   if (group.isLoading) return <Screen back title=" "><Loading /></Screen>;
   if (group.error && !group.data) return <Screen back title="Group"><ErrorView error={group.error} onRetry={() => void group.refetch()} /></Screen>;
   const g = group.data!;
@@ -56,6 +69,7 @@ export default function GroupDetail() {
         </T>
       </View>
       <Segmented value={tab} onChange={setTab} options={[{ value: 'expenses', label: 'Expenses' }, { value: 'balances', label: 'Balances' }]} />
+      {msg ? <T v="label" color="muted" accessibilityLiveRegion="polite">{msg}</T> : null}
     </View>
   );
 
@@ -130,14 +144,20 @@ export default function GroupDetail() {
           </Card>
         </>
       )}
-      {msg ? <T v="label" color="muted">{msg}</T> : null}
       <T v="caption" color="muted">Debts older than 3 days get an automatic reminder. A debt clears only when the person who is owed confirms the payment.</T>
     </View>
   );
 
   return (
     <Screen back scroll={false} padded={false}
-      right={isAdmin ? <IconButton label="Group settings" onPress={() => router.push(`/group/${id}/edit`)}><Settings color={c.ink} size={24} strokeWidth={1.75} /></IconButton> : undefined}
+      right={
+        <View style={{ flexDirection: 'row' }}>
+          <IconButton label="Invite people with a link" onPress={() => { if (online) invite.mutate(); else setMsg('Sharing an invite needs a connection.'); }}>
+            <UserPlus color={c.ink} size={24} strokeWidth={1.75} />
+          </IconButton>
+          {isAdmin ? <IconButton label="Group settings" onPress={() => router.push(`/group/${id}/edit`)}><Settings color={c.ink} size={24} strokeWidth={1.75} /></IconButton> : null}
+        </View>
+      }
       footer={
         <View style={{ flexDirection: 'row', gap: space[3] }}>
           <Button style={{ flex: 1 }} variant="secondary" label="Scan bill" icon={<Camera size={20} color={c.brand} />} onPress={() => router.push(`/group/${id}/scan`)} />

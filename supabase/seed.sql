@@ -1,4 +1,5 @@
 -- Demo data. Every seeded account's password is: SplitIt@2026
+-- Demo UPI IDs use the non-existent handle @example so a test payment can never reach a real person.
 -- Phone login works with the numbers below (10 digits or +91 form).
 -- Run as postgres. Expenses and settlements go through the same functions the app uses.
 
@@ -28,11 +29,11 @@ begin
     on conflict do nothing;
   end loop;
   update public.profiles set upi_id = case id
-    when '11111111-1111-4111-8111-111111111111' then 'priya.sharma@oksbi'
-    when '22222222-2222-4222-8222-222222222222' then 'ravi.kumar@okhdfc'
-    when '33333333-3333-4333-8333-333333333333' then 'ananya.iyer@okicici'
-    when '44444444-4444-4444-8444-444444444444' then 'arjun.mehta@ybl'
-    when '55555555-5555-4555-8555-555555555555' then 'meera.nair@okaxis' end
+    when '11111111-1111-4111-8111-111111111111' then 'priya.demo@example'
+    when '22222222-2222-4222-8222-222222222222' then 'ravi.demo@example'
+    when '33333333-3333-4333-8333-333333333333' then 'ananya.demo@example'
+    when '44444444-4444-4444-8444-444444444444' then 'arjun.demo@example'
+    when '55555555-5555-4555-8555-555555555555' then 'meera.demo@example' end
   where upi_id is null and id in ('11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222',
     '33333333-3333-4333-8333-333333333333', '44444444-4444-4444-8444-444444444444', '55555555-5555-4555-8555-555555555555');
 end $$;

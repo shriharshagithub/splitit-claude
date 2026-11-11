@@ -74,6 +74,12 @@ export default function SettleUp() {
         }
         launched.current = true;
         await Linking.openURL(link); // Android shows the UPI app chooser
+      } else if (Platform.OS === 'web' && typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent)) {
+        // Chrome on Android hands upi:// links to the installed UPI apps. Keep the QR code on screen
+        // as a fallback in case no UPI app picks it up.
+        launched.current = true;
+        setStage('qr');
+        window.location.href = link;
       } else {
         setStage('qr'); // iPhone and computers: no UPI chooser, so show a QR code and the UPI ID
       }

@@ -77,7 +77,7 @@ export async function getGroup(id: string): Promise<GroupDetail> {
   if (!g) throw new AppError('This group does not exist or you are not a member.');
   const [{ data: members, error: mErr }, { data: invites, error: iErr }] = await Promise.all([
     supabase.from('group_members').select('user_id, role, profile:profiles(id, full_name, phone, email, upi_id, avatar_url)').eq('group_id', id),
-    supabase.from('group_invites').select('id, contact, contact_kind, token, created_at').eq('group_id', id).is('accepted_at', null),
+    supabase.from('group_invites').select('id, contact, contact_kind, token, created_at').eq('group_id', id).is('accepted_at', null).neq('contact_kind', 'link'),
   ]);
   if (mErr || iErr) throw toAppError(mErr ?? iErr);
   const sorted = ((members ?? []) as unknown as GroupDetail['members']).sort((a, b) => a.profile.full_name.localeCompare(b.profile.full_name));
@@ -150,6 +150,8 @@ export const cancelInvite = (inviteId: string) => rpc<void>('cancel_invite', { i
 export const updateGroup = (g: string, name: string, type: GroupType) => rpc<void>('update_group', { g, p_name: name, p_type: type });
 export const deleteGroup = (g: string) => rpc<void>('delete_group', { g });
 export const acceptInvite = (token: string) => rpc<string>('accept_invite', { invite_token: token });
+export const getGroupInviteLink = (g: string) => rpc<string>('group_invite_link', { g });
+export const resetGroupInviteLink = (g: string) => rpc<void>('reset_group_invite_link', { g });
 export const setMyPhone = (phone: string) => rpc<void>('set_my_phone', { p_phone: phone });
 
 export const saveExpense = (p: ExpensePayload) =>

@@ -2,7 +2,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { Avatar, Button, Card, ErrorView, Field, Loading, Pill, Row, Screen, Segmented, T } from '@/components/ui';
-import { addMember, cancelInvite, deleteGroup, removeMember, updateGroup } from '@/lib/api';
+import { addMember, cancelInvite, deleteGroup, getGroupInviteLink, removeMember, resetGroupInviteLink, updateGroup } from '@/lib/api';
 import { useAuth, useMe } from '@/lib/auth';
 import { errText } from '@/lib/errors';
 import { useGroup } from '@/lib/hooks';
@@ -105,6 +105,17 @@ export default function EditGroup() {
             </Row>
           ))}
         </Card>
+      </View>
+
+      <View style={{ gap: space[2] }}>
+        <T v="heading">Invite link</T>
+        <T color="muted">Anyone with the group's link can sign up or log in and join. Reset it if it was sent to the wrong person; the old link stops working.</T>
+        <View style={{ flexDirection: 'row', gap: space[3], flexWrap: 'wrap' }}>
+          <Button small variant="secondary" label="Share invite link" disabled={!online} loading={busy === 'link'}
+            onPress={() => act('link', async () => { await share(await getGroupInviteLink(id)); })} />
+          <Button small variant="quiet" label="Reset link" disabled={!online} loading={busy === 'reset'}
+            onPress={() => act('reset', () => resetGroupInviteLink(id), 'Old invite link cancelled. Share the new one.')} />
+        </View>
       </View>
 
       {confirmDelete ? (

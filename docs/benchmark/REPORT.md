@@ -102,6 +102,17 @@ Model choice, the Supabase project and plan, which API keys you could provide, h
 | Settle screen used a stale payee UPI ID and payment status from cache | Browser test | Yes. Pay was disabled after the payee added a UPI ID, and a retry after a decline was blocked. |
 | Tab bar labels clipped at phone size | Screenshot review | Yes. Fails DoD item 14. |
 
+### Defects you found while testing (after delivery)
+
+| Defect | Fix |
+| --- | --- |
+| Date entry was a typed DD/MM/YYYY box; "today" used UTC, not IST | Calendar picker with Today / Yesterday, dates shown as "3 Nov 2026", local dates |
+| Profile photo upload refused (missing storage read policy needed for overwrite) | Policy added, upload no longer overwrites |
+| No way to share an invite when the person is already on SplitIt; no email when added | Reusable group invite link for every member; "added to group" email |
+| (Found while checking UPI) Demo UPI IDs could belong to real people; Android browsers got a QR code instead of the UPI app | Demo IDs made unpayable; Android browsers open the UPI app directly |
+
+Also found by me on the live site: a false "You are offline" banner (NetInfo reachability probe), and desktop browsers stretching the app full width. Both fixed.
+
 ### Process misses (my own)
 
 - **Didn't ask about your visual taste before designing.** You weren't happy with the colours and pattern. A short question before the design stage would have avoided that.
