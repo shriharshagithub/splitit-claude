@@ -9,7 +9,7 @@ import { useGroup } from '@/lib/hooks';
 import { inviteLink } from '@/lib/links';
 import { useSync } from '@/lib/offline';
 import { invalidateMoney, queryClient, qk } from '@/lib/query';
-import { shareText } from '@/lib/share';
+import { openWhatsApp, shareText } from '@/lib/share';
 import type { GroupType } from '@/lib/types';
 import { space } from '@/theme';
 
@@ -54,7 +54,8 @@ export default function EditGroup() {
   const isAdmin = g.members.some((m) => m.user_id === me && m.role === 'admin');
   if (!isAdmin) return <Screen back title="Group settings"><T>Only the group admin can change this group.</T></Screen>;
 
-  const share = (token: string) => shareText(`${profile?.full_name ?? 'A friend'} added you to "${g.name}" on SplitIt. Join here: ${inviteLink(token)}`)
+  const inviteText = (token: string) => `${profile?.full_name ?? 'A friend'} added you to "${g.name}" on SplitIt. Join here: ${inviteLink(token)}`;
+  const share = (token: string) => shareText(inviteText(token))
     .then((r) => setMsg({ text: r === 'copied' ? 'Invite link copied.' : 'Invite shared.', bad: false }));
 
   return (
@@ -76,8 +77,11 @@ export default function EditGroup() {
             onPress={() => act('add', async () => {
               const r = await addMember(id, contact);
               setContact('');
-              if (r.status === 'invited' && r.token) await share(r.token);
-              setMsg({ text: r.status === 'added' ? `${r.name} was added.` : r.status === 'already_member' ? 'They are already in this group.' : `${r.contact} is not on SplitIt yet. Send them the invite link${r.kind === 'email' ? ' (we also emailed one, but it may not arrive)' : ''}.`, bad: false });
+              if (r.status === 'invited' && r.token) {
+                if (r.kind === 'phone') await openWhatsApp(r.contact, inviteText(r.token));
+                else await share(r.token);
+              }
+              setMsg({ text: r.status === 'added' ? `${r.name} was added.` : r.status === 'already_member' ? 'They are already in this group.' : `${r.contact} is not on SplitIt yet. ${r.kind === 'phone' ? 'Send the invite on WhatsApp, or share the link another way' : 'Send them the invite link (we also emailed one, but it may not arrive)'}.`, bad: false });
             })} />
         </View>
         <Card>
@@ -100,6 +104,9 @@ export default function EditGroup() {
                 <T lines={1}>{inv.contact}</T>
                 <T v="caption" color="pending">Invited, not joined yet</T>
               </View>
+              {inv.contact_kind === 'phone' ? (
+                <Button small variant="secondary" label="WhatsApp" onPress={() => void openWhatsApp(inv.contact, inviteText(inv.token))} />
+              ) : null}
               <Button small variant="secondary" label="Share" onPress={() => void share(inv.token)} />
               <Button small variant="quiet" label="Cancel" disabled={!online} onPress={() => act(inv.id, () => cancelInvite(inv.id))} />
             </Row>

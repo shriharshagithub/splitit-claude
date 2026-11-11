@@ -10,7 +10,7 @@ import { toAppError } from '@/lib/errors';
 import { inviteLink } from '@/lib/links';
 import { useSync } from '@/lib/offline';
 import { invalidateMoney } from '@/lib/query';
-import { shareText } from '@/lib/share';
+import { openWhatsApp, shareText } from '@/lib/share';
 import type { GroupType } from '@/lib/types';
 import { space, useColors } from '@/theme';
 
@@ -60,8 +60,12 @@ export default function NewGroup() {
             <Row key={m.contact} first={i === 0}>
               <View style={{ flex: 1, minWidth: 0 }}>
                 <T lines={1}>{m.contact}</T>
-                <T v="caption" color="muted">{m.kind === 'email' ? 'We emailed an invite. Share the link too, in case the email does not arrive.' : 'Send them the link'}</T>
+                <T v="caption" color="muted">{m.kind === 'email' ? 'We emailed an invite. Share the link too, in case the email does not arrive.' : 'Send them the link on WhatsApp or SMS'}</T>
               </View>
+              {m.kind === 'phone' ? (
+                <Button small variant="secondary" label="WhatsApp"
+                  onPress={() => void openWhatsApp(m.contact, `${profile?.full_name ?? 'A friend'} added you to "${name.trim()}" on SplitIt. Join here: ${inviteLink(m.token!)}`)} />
+              ) : null}
               <Button small variant="secondary" label="Share link"
                 onPress={() => void shareText(`${profile?.full_name ?? 'A friend'} added you to "${name.trim()}" on SplitIt. Join here: ${inviteLink(m.token!)}`)} />
             </Row>
