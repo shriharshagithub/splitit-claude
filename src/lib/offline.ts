@@ -71,12 +71,15 @@ export async function initOffline(onSynced: () => void) {
     onlineManager.setOnline(online);
     if (cameBack) void flush();
   };
-  NetInfo.addEventListener((s) => setOnline(Boolean(s.isConnected) && s.isInternetReachable !== false));
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
-    // Browsers report connectivity directly; NetInfo can miss these events.
+    // Browsers report connectivity directly. NetInfo's extra reachability probe can fail behind
+    // proxies or strict networks and would wrongly show the app as offline, so it is not used here.
     setOnline(navigator.onLine);
     window.addEventListener('online', () => setOnline(true));
     window.addEventListener('offline', () => setOnline(false));
+  } else {
+    // On phones, trust the connection state; a failed request is retried by the queue anyway.
+    NetInfo.addEventListener((s) => setOnline(s.isConnected !== false));
   }
   // Safety net: retry queued writes every 15 s and whenever the app comes to the foreground.
   setInterval(() => { if (state.outbox.length) void flush(); }, 15_000);
