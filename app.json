@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "splitit",
+    "name": "SplitIt",
     "slug": "splitit",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -8,36 +8,58 @@
     "scheme": "splitit",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "ai.neocrew.splitit",
+      "infoPlist": {
+        "LSApplicationQueriesSchemes": [
+          "upi"
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#2b2f8f",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "package": "ai.neocrew.splitit",
+      "permissions": [
+        "android.permission.CAMERA"
+      ]
     },
     "web": {
-      "output": "server",
-      "favicon": "./assets/images/favicon.png"
+      "output": "single",
+      "favicon": "./assets/images/favicon.png",
+      "name": "SplitIt",
+      "shortName": "SplitIt",
+      "themeColor": "#2b2f8f",
+      "backgroundColor": "#f5f5fb"
     },
     "plugins": [
       "expo-router",
+      "@sentry/react-native",
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#2b2f8f",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
       ],
-      "@sentry/react-native"
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "SplitIt uses the camera to scan restaurant bills.",
+          "photosPermission": "SplitIt reads photos of bills you choose to scan."
+        }
+      ],
+      "./plugins/withUpiQueries.js"
     ],
     "experiments": {
-      "typedRoutes": true,
-      "reactCompiler": true
+      "typedRoutes": false,
+      "reactCompiler": true,
+      "baseUrl": "/splitit-claude"
     }
   }
 }

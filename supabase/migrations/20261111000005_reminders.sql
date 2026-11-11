@@ -3,7 +3,7 @@
 
 create function public._verify_hook(secret text) returns boolean
 language sql stable security definer set search_path = '' as $$
-  select exists (select 1 from vault.decrypted_secrets where name = 'hook_secret' and decrypted_secret = secret);
+  select exists (select 1 from vault.decrypted_secrets where name = 'hook_secret' and decrypted_secret = $1);  -- $1: the view has its own `secret` column
 $$;
 
 -- Every member of every group that has an open balance, with what the reminder rules need.
