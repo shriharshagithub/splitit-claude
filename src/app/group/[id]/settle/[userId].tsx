@@ -33,6 +33,13 @@ export default function SettleUp() {
   const [copied, setCopied] = useState(false);
   const launched = useRef(false);
 
+  // Always use the payee's latest UPI ID, not a cached one.
+  useEffect(() => {
+    void group.refetch();
+    void settlements.refetch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // When the person comes back from their UPI app, ask whether the payment went through.
   useEffect(() => {
     const sub = AppState.addEventListener('change', (s) => {
@@ -46,7 +53,7 @@ export default function SettleUp() {
 
   const creditor = group.data?.members.find((m) => m.user_id === to)?.profile;
   const debt = transfers?.find((t) => t.from === me && t.to === to);
-  const claim = settlements.data?.find((s) => s.from_user === me && s.to_user === to && s.status === 'marked_paid');
+  const claim = settlements.isFetching ? undefined : settlements.data?.find((s) => s.from_user === me && s.to_user === to && s.status === 'marked_paid');
   const first = creditor?.full_name.split(' ')[0] ?? 'them';
   const amount = debt?.amount ?? 0;
 
@@ -123,7 +130,7 @@ export default function SettleUp() {
         <View style={{ gap: space[3] }}>
           {error ? <T color="danger">{error}</T> : null}
           {!online ? <T v="caption" color="muted">Settling up needs a connection.</T> : null}
-          <Button variant="upi" label={`Pay ${formatINR(amount)} via UPI`} onPress={() => begin('upi')} loading={busy} disabled={!creditor?.upi_id || !online} />
+          <Button variant="upi" label={`Pay ${formatINR(amount)} via UPI`} onPress={() => begin('upi')} loading={busy} disabled={!creditor?.upi_id || !online || group.isFetching} />
           {!creditor?.upi_id ? <T v="caption" color="muted">Ask {first} to add a UPI ID in their profile. You can still settle in cash.</T> : null}
           <Button variant="secondary" label="I paid in cash" onPress={() => begin('cash')} disabled={busy || !online} />
         </View>

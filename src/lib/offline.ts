@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { onlineManager } from '@tanstack/react-query';
 import { useSyncExternalStore } from 'react';
+import { AppState, Platform } from 'react-native';
 import { deleteExpense, saveExpense } from './api';
 import { isNetworkError, toAppError } from './errors';
 import type { ExpensePayload } from './types';
@@ -64,14 +65,29 @@ export async function initOffline(onSynced: () => void) {
   } catch {
     set({ ready: true });
   }
-  NetInfo.addEventListener((s) => {
-    const online = Boolean(s.isConnected) && s.isInternetReachable !== false;
+  const setOnline = (online: boolean) => {
     const cameBack = online && !state.online;
-    set({ online });
+    if (online !== state.online) set({ online });
     onlineManager.setOnline(online);
     if (cameBack) void flush();
-  });
+  };
+  NetInfo.addEventListener((s) => setOnline(Boolean(s.isConnected) && s.isInternetReachable !== false));
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    // Browsers report connectivity directly; NetInfo can miss these events.
+    setOnline(navigator.onLine);
+    window.addEventListener('online', () => setOnline(true));
+    window.addEventListener('offline', () => setOnline(false));
+  }
+  // Safety net: retry queued writes every 15 s and whenever the app comes to the foreground.
+  setInterval(() => { if (state.outbox.length) void flush(); }, 15_000);
+  AppState.addEventListener('change', (s) => { if (s === 'active') void flush(); });
   void flush();
+}
+
+/** A request failed with a network error: treat the device as offline until it proves otherwise. */
+export function noteNetworkFailure() {
+  if (state.online) set({ online: false });
+  onlineManager.setOnline(false);
 }
 
 export async function enqueue(item: Omit<OutboxItem, 'queuedAt'>) {
@@ -129,8 +145,8 @@ let flushing: Promise<void> | null = null;
 
 export function flush(): Promise<void> {
   if (flushing) return flushing;
+  if (!state.online || state.outbox.length === 0) return Promise.resolve();
   flushing = (async () => {
-    if (!state.online || state.outbox.length === 0) return;
     set({ syncing: true });
     let changed = false;
     try {
