@@ -34,7 +34,7 @@ A working app and backend, deployed from one Claude Code session:
 | 12 | Cannot reach another group's data by URL or API | **Pass** | 43 database checks (an outsider's reads and writes, member versus admin, payer versus receiver, anonymous access) plus API and URL tests. |
 | 13 | Forced crash appears in error reporting | **Blocked on owner** | Sentry is wired in the app and the backend, with a test-crash button in Profile. Needs the Sentry DSN. |
 | 14 | Every screen renders on a real phone, nothing cut off | **Checked at 390 px in a browser** | One clipping bug (tab labels) was found and fixed. Needs a device pass. |
-| 15 | Installs on a phone, backend reachable, code exportable | **APK building; backend and code: pass** | APK from the GitHub Actions artifact; standard Expo and Supabase code with a README. |
+| 15 | Installs on a phone, backend reachable, code exportable | **APK built; install needs a phone** | APK built by GitHub Actions in 17 minutes (artifact `splitit-apk`); backend reachable; standard Expo and Supabase code with a README. |
 
 ## 2. Time, tokens and cost
 
