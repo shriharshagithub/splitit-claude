@@ -3,12 +3,14 @@ import { Bell, Plus } from 'lucide-react-native';
 import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Card, ErrorView, Loading, Money, OfflineBanner, Pill, Row, SplitDisc, T } from '@/components/ui';
+import { useAuth } from '@/lib/auth';
 import { useMyGroups, useUnreadCount } from '@/lib/hooks';
 import { radius, space, useColors } from '@/theme';
 
 export default function Home() {
   const c = useColors();
   const groups = useMyGroups();
+  const { profile } = useAuth();
   const unread = useUnreadCount();
   const list = groups.data ?? [];
   const owed = list.filter((g) => g.my_net > 0).reduce((a, g) => a + Number(g.my_net), 0);
@@ -51,6 +53,14 @@ export default function Home() {
                 </View>
               )}
             </Card>
+
+            {owed > 0 && profile && !profile.upi_id ? (
+              <Card style={{ padding: space[4], gap: space[3], backgroundColor: c.accentSoft, borderColor: c.accentSoft }}>
+                <T v="bodyStrong" color="pending">Add your UPI ID so friends can pay you</T>
+                <T v="label" color="pending">You are owed <Money paise={owed} v="amountSm" color="pending" />. Without a UPI ID, people can only settle with you in cash.</T>
+                <Button small label="Add UPI ID" onPress={() => router.push('/profile')} style={{ alignSelf: 'flex-start' }} />
+              </Card>
+            ) : null}
 
             {list.length === 0 ? (
               <Card style={{ padding: space[6], gap: space[4], alignItems: 'flex-start' }}>

@@ -115,6 +115,12 @@ export default function GroupDetail() {
       ) : (
         <>
           <T v="caption" color="muted">{transfers.length === 1 ? '1 payment clears' : `${transfers.length} payments clear`} every debt in this group.</T>
+          {transfers.some((t) => t.to === me) && profile && !profile.upi_id ? (
+            <Card style={{ padding: space[3], gap: space[2], backgroundColor: c.accentSoft, borderColor: c.accentSoft }}>
+              <T v="label" color="pending">Add your UPI ID so people who owe you can pay by UPI. Until then they can only settle in cash.</T>
+              <Button small label="Add UPI ID" onPress={() => router.push('/profile')} style={{ alignSelf: 'flex-start' }} />
+            </Card>
+          ) : null}
           <Card>
             {transfers.map((t, i) => {
               const claim = open.find((s) => s.from_user === t.from && s.to_user === t.to && s.status === 'marked_paid');
