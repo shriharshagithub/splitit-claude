@@ -16,7 +16,7 @@ Product brief: [docs/PRD.md](docs/PRD.md). Build plan and decisions: [docs/PLAN.
 | Web (iPhone, desktop) | https://shriharshagithub.github.io/splitit-claude (after Pages is enabled, see below) |
 | iPhone without TestFlight | Run `npx expo start --tunnel` and scan the QR code with the free **Expo Go** app (needs a free Expo account). Native crash capture and the UPI app chooser only work in a real build. |
 
-Demo accounts (password `SplitIt@2026` for all):
+Demo accounts (password `SplitIt@2026` for all). **These were removed from the live project on request so it could be used for real testing; run `supabase/seed.sql` to restore them.**
 
 | Name | Phone | Groups |
 | --- | --- | --- |
