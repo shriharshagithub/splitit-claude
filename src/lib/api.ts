@@ -179,7 +179,7 @@ export async function markNotificationsRead(ids: string[]) {
 export async function uploadAvatar(userId: string, uri: string, mime: string): Promise<string> {
   const body = await (await fetch(uri)).arrayBuffer();
   const path = `${userId}/avatar-${Date.now()}.${mime === 'image/png' ? 'png' : 'jpg'}`;
-  const { error } = await supabase.storage.from('avatars').upload(path, body, { contentType: mime, upsert: true });
+  const { error } = await supabase.storage.from('avatars').upload(path, body, { contentType: mime });
   if (error) throw new AppError(/size/i.test(error.message) ? 'The photo must be 2 MB or smaller.' : 'We could not upload the photo. Try again.');
   return supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl;
 }
