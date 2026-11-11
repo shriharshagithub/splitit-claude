@@ -1,5 +1,17 @@
 const APP_URL = (Deno.env.get('APP_URL') ?? 'https://shriharshagithub.github.io/splitit-claude').replace(/\/$/, '');
-const FROM = Deno.env.get('RESEND_FROM') ?? 'SplitIt <hello@thewowlabzteam.site>';
+const DEFAULT_FROM = 'SplitIt <hello@thewowlabzteam.site>';
+
+/** Accepts "Name <a@b.c>", "a@b.c" or a bare domain "b.c"; anything else falls back to the default. */
+export function senderFrom(raw: string | undefined): string {
+  const v = (raw ?? '').trim().replace(/^["']+|["']+$/g, '').trim();
+  if (!v) return DEFAULT_FROM;
+  if (/^[^<>@]*<[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+>$/.test(v)) return v;
+  if (/^[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+$/.test(v)) return `SplitIt <${v}>`;
+  if (/^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(v)) return `SplitIt <hello@${v}>`;
+  return DEFAULT_FROM;
+}
+
+const FROM = senderFrom(Deno.env.get('RESEND_FROM'));
 
 export const appLink = (path: string) => `${APP_URL}${path}`;
 
@@ -30,6 +42,6 @@ export async function sendEmail(to: string, subject: string, html: string): Prom
     headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ from: FROM, to: [to], subject, html }),
   });
-  if (!res.ok) return `resend ${res.status}: ${(await res.text()).slice(0, 200)}`;
+  if (!res.ok) return `resend ${res.status} (from ${FROM}): ${(await res.text()).slice(0, 200)}`;
   return null;
 }
