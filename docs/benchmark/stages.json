@@ -2,5 +2,7 @@
   {"name": "0-briefing", "start": "2026-11-11T07:11:00Z"},
   {"name": "1-plan", "start": "2026-11-11T07:13:51Z"},
   {"name": "2-design", "start": "2026-11-11T07:15:47Z"},
-  {"name": "3-build", "start": "2026-11-11T07:54:22Z"}
+  {"name": "3-build", "start": "2026-11-11T07:54:22Z"},
+  {"name": "4-test-and-fix", "start": "2026-11-11T09:56:37Z"},
+  {"name": "5-report", "start": "2026-11-11T14:40:08Z"}
 ]

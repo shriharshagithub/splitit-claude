@@ -2,6 +2,8 @@
 
 This is the Claude Code half of the comparison with NeoCrew. Everything below is measured from this session's transcript, the repository and the live backend. The NeoCrew column in section 6 is left for the NeoCrew run of the same PRD ([PRD.md](../PRD.md)) to fill in.
 
+**Final totals at 20:10 IST, 11 Nov 2026, including the afternoon of testing and fixes:** 369 requests, 494,351 output tokens, 201.6M cache-read and 1.11M cache-write tokens, $60.97 at API list prices, 7 h 29 min on the clock and 3 h 52 min of active AI work. Sections 2 and 6 below are the earlier snapshot taken at first delivery (15:11 IST). The non-technical write-up with designs and diagrams is a separate shared doc.
+
 Raw numbers: [usage-snapshot.json](usage-snapshot.json), produced by `python3 scripts/usage-report.py <transcript dir> docs/benchmark/stages.json`.
 
 ## 1. Result
