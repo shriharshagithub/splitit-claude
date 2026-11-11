@@ -7,7 +7,7 @@ import { router, Stack, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { useColorScheme, View } from 'react-native';
+import { Platform, useColorScheme, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { initOffline } from '@/lib/offline';
@@ -71,7 +71,12 @@ function RootLayout() {
       <PersistQueryClientProvider client={queryClient} persistOptions={{ persister, maxAge: persistMaxAge }}>
         <AuthProvider>
           <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
-          <Gate />
+          {/* On wide screens (desktop browsers) show the app as a phone-width column. */}
+          <View style={{ flex: 1, backgroundColor: c.sunken }}>
+            <View style={{ flex: 1, width: '100%', maxWidth: 480, alignSelf: 'center', backgroundColor: c.ground, ...(Platform.OS === 'web' ? { borderLeftWidth: 1, borderRightWidth: 1, borderColor: c.line } : {}) }}>
+              <Gate />
+            </View>
+          </View>
         </AuthProvider>
       </PersistQueryClientProvider>
     </SafeAreaProvider>
