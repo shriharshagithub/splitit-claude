@@ -1,35 +1,82 @@
-[
-  {
-    "stage": "plan",
-    "model": "claude-fable-5-2",
-    "first": "2026-11-11T07:11:18.158Z",
-    "last": "2026-11-11T07:15:00.101Z",
-    "input_tokens": 21,
-    "cache_creation_input_tokens": 69912,
-    "cache_read_input_tokens": 968642,
-    "output_tokens": 10356,
-    "requests": 9
+{
+  "per_stage_model": [
+    {
+      "stage": "0-briefing",
+      "model": "claude-fable-5-2",
+      "input": 10,
+      "cache_write": 43522,
+      "cache_read": 382430,
+      "output": 1692,
+      "requests": 4,
+      "cost_usd": 0.84
+    },
+    {
+      "stage": "1-plan",
+      "model": "claude-fable-5-2",
+      "input": 13,
+      "cache_write": 38223,
+      "cache_read": 720976,
+      "output": 9020,
+      "requests": 6,
+      "cost_usd": 1.12
+    },
+    {
+      "stage": "2-design",
+      "model": "claude-fable-5-2",
+      "input": 24,
+      "cache_write": 61569,
+      "cache_read": 1855198,
+      "output": 24633,
+      "requests": 10,
+      "cost_usd": 2.34
+    },
+    {
+      "stage": "2-design",
+      "model": "claude-opus-5-5",
+      "input": 32,
+      "cache_write": 221095,
+      "cache_read": 4206207,
+      "output": 65617,
+      "requests": 18,
+      "cost_usd": 3.92
+    },
+    {
+      "stage": "3-build",
+      "model": "claude-opus-5-5",
+      "input": 259,
+      "cache_write": 389241,
+      "cache_read": 59099125,
+      "output": 262470,
+      "requests": 125,
+      "cost_usd": 20.18
+    }
+  ],
+  "time": {
+    "0-briefing": {
+      "active_minutes": 2.8,
+      "wall_minutes": 2.6
+    },
+    "1-plan": {
+      "active_minutes": 1.8,
+      "wall_minutes": 1.8
+    },
+    "2-design": {
+      "active_minutes": 15.3,
+      "wall_minutes": 38.6
+    },
+    "3-build": {
+      "active_minutes": 99.4,
+      "wall_minutes": 106.3
+    }
   },
-  {
-    "stage": "design",
-    "model": "claude-fable-5-2",
-    "first": "2026-11-11T07:15:47.950Z",
-    "last": "2026-11-11T07:48:24.514Z",
-    "input_tokens": 26,
-    "cache_creation_input_tokens": 73402,
-    "cache_read_input_tokens": 1989962,
-    "output_tokens": 24989,
-    "requests": 11
-  },
-  {
-    "stage": "design",
-    "model": "claude-opus-5-5",
-    "first": "2026-11-11T07:15:47.950Z",
-    "last": "2026-11-11T07:48:24.514Z",
-    "input_tokens": 30,
-    "cache_creation_input_tokens": 220315,
-    "cache_read_input_tokens": 3922208,
-    "output_tokens": 63100,
-    "requests": 17
+  "totals": {
+    "requests": 163,
+    "output_tokens": 363432,
+    "cache_read_tokens": 66263936,
+    "cache_write_tokens": 753650,
+    "input_tokens": 338,
+    "cost_usd": 28.4,
+    "active_minutes": 119.3,
+    "wall_minutes": 150.5
   }
-]
+}

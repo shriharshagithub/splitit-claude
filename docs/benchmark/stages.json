@@ -1,4 +1,6 @@
 [
-  {"name": "plan", "start": "2026-11-11T07:11:00Z"},
-  {"name": "design", "start": "2026-11-11T07:15:39Z"}
+  {"name": "0-briefing", "start": "2026-11-11T07:11:00Z"},
+  {"name": "1-plan", "start": "2026-11-11T07:13:51Z"},
+  {"name": "2-design", "start": "2026-11-11T07:15:47Z"},
+  {"name": "3-build", "start": "2026-11-11T07:54:22Z"}
 ]
