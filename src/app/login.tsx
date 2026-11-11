@@ -5,7 +5,7 @@ import { Platform, View } from 'react-native';
 import { Button, Field, Screen, Segmented, SplitDisc, T } from '@/components/ui';
 import { acceptInvite, invitePreview, loginWithPhone, sendPasswordReset, signUp } from '@/lib/api';
 import { toAppError } from '@/lib/errors';
-import { authRedirect } from '@/lib/links';
+import { authRedirect, WEB_URL } from '@/lib/links';
 import { supabase } from '@/lib/supabase';
 import { space, useColors } from '@/theme';
 
@@ -56,7 +56,8 @@ export default function Login() {
       router.replace('/');
     } else {
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())) throw new Error('Enter the email on your account.');
-      await sendPasswordReset(email, authRedirect('/reset-password'));
+      // Reset links always open the web app, which works on any device; app deep links are not needed.
+      await sendPasswordReset(email, `${WEB_URL}/reset-password`);
       setInfo('If that email has an account, a reset link is on its way. It works once and expires in an hour.');
     }
   });
