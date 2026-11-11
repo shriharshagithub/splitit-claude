@@ -1,0 +1,13 @@
+[
+  {
+    "stage": "plan",
+    "model": "claude-fable-5-2",
+    "first": "2026-11-11T07:11:18.158Z",
+    "last": "2026-11-11T07:15:00.101Z",
+    "input_tokens": 21,
+    "cache_creation_input_tokens": 69912,
+    "cache_read_input_tokens": 968642,
+    "output_tokens": 10356,
+    "requests": 9
+  }
+]
