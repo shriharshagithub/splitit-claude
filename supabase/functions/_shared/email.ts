@@ -5,7 +5,8 @@ const DEFAULT_FROM = 'SplitIt <hello@thewowlabzteam.site>';
 export function senderFrom(raw: string | undefined): string {
   const v = (raw ?? '').trim().replace(/^["']+|["']+$/g, '').trim();
   if (!v) return DEFAULT_FROM;
-  if (/^[^<>@]*<[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+>$/.test(v)) return v;
+  const named = v.match(/^([^<>@]*)<\s*([^\s<>@]+@[^\s<>@]+\.[^\s<>@]+)\s*>$/);
+  if (named) return `${named[1].trim().replace(/^["']+|["']+$/g, '') || 'SplitIt'} <${named[2]}>`;
   if (/^[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+$/.test(v)) return `SplitIt <${v}>`;
   if (/^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(v)) return `SplitIt <hello@${v}>`;
   return DEFAULT_FROM;
