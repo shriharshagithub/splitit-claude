@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react';
 import { Platform, useColorScheme, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '@/lib/auth';
+import { useLiveUpdates } from '@/lib/realtime';
 import { initOffline } from '@/lib/offline';
 import { invalidateMoney, persistMaxAge, persister, queryClient } from '@/lib/query';
 import { useColors } from '@/theme';
@@ -32,6 +33,7 @@ function Gate() {
   const { session, loading, recovering } = useAuth();
   const segments = useSegments();
   const c = useColors();
+  useLiveUpdates();
   useEffect(() => {
     if (loading) return;
     const top = segments[0] ?? '';
