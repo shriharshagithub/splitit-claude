@@ -77,7 +77,7 @@ export default function EditGroup() {
               const r = await addMember(id, contact);
               setContact('');
               if (r.status === 'invited' && r.token) await share(r.token);
-              setMsg({ text: r.status === 'added' ? `${r.name} was added.` : r.status === 'already_member' ? 'They are already in this group.' : `${r.contact} is not on SplitIt yet. Send them the invite link.`, bad: false });
+              setMsg({ text: r.status === 'added' ? `${r.name} was added.` : r.status === 'already_member' ? 'They are already in this group.' : `${r.contact} is not on SplitIt yet. Send them the invite link${r.kind === 'email' ? ' (we also emailed one, but it may not arrive)' : ''}.`, bad: false });
             })} />
         </View>
         <Card>

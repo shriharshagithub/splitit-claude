@@ -60,7 +60,7 @@ export default function NewGroup() {
             <Row key={m.contact} first={i === 0}>
               <View style={{ flex: 1, minWidth: 0 }}>
                 <T lines={1}>{m.contact}</T>
-                <T v="caption" color="muted">{m.kind === 'email' ? 'Invite emailed' : 'Send them the link'}</T>
+                <T v="caption" color="muted">{m.kind === 'email' ? 'We emailed an invite. Share the link too, in case the email does not arrive.' : 'Send them the link'}</T>
               </View>
               <Button small variant="secondary" label="Share link"
                 onPress={() => void shareText(`${profile?.full_name ?? 'A friend'} added you to "${name.trim()}" on SplitIt. Join here: ${inviteLink(m.token!)}`)} />
