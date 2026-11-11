@@ -1,0 +1,26 @@
+{
+ "v": 3,
+ "createdOnFiles": {"v": 1, "at": "2026-11-11T07:40:00Z"},
+ "title": "SplitIt Screens",
+ "launch": {"view": "canvas"},
+ "pages": [],
+ "boards": {
+  "Auth.dc.html": {"x": 0, "y": 0, "w": 390, "h": 844, "title": "1 Auth"},
+  "Main.dc.html": {"x": 470, "y": 0, "w": 390, "h": 844, "title": "2 Home"},
+  "CreateGroup.dc.html": {"x": 940, "y": 0, "w": 390, "h": 844, "title": "3 Create group"},
+  "GroupExpenses.dc.html": {"x": 1410, "y": 0, "w": 390, "h": 844, "title": "4 Group detail: Expenses (offline)"},
+  "GroupBalances.dc.html": {"x": 1880, "y": 0, "w": 390, "h": 844, "title": "4 Group detail: Balances"},
+  "AddExpense.dc.html": {"x": 2350, "y": 0, "w": 390, "h": 844, "title": "5 Add expense", "is_interactive": true},
+  "ScanBill.dc.html": {"x": 0, "y": 964, "w": 390, "h": 844, "title": "6 Scan bill", "is_interactive": true},
+  "SettleUp.dc.html": {"x": 470, "y": 964, "w": 390, "h": 844, "title": "7 Settle up (Android)"},
+  "SettleUpIOS.dc.html": {"x": 940, "y": 964, "w": 390, "h": 844, "title": "7 Settle up (iPhone and web: QR)", "is_interactive": true},
+  "PaymentCheck.dc.html": {"x": 1410, "y": 964, "w": 390, "h": 844, "title": "7 Back from UPI app", "is_interactive": true},
+  "Activity.dc.html": {"x": 1880, "y": 964, "w": 390, "h": 844, "title": "8 Activity", "is_interactive": true},
+  "Profile.dc.html": {"x": 2350, "y": 964, "w": 390, "h": 844, "title": "9 Profile and settings", "is_interactive": true}
+ },
+ "order": ["Auth.dc.html", "Main.dc.html", "CreateGroup.dc.html", "GroupExpenses.dc.html", "GroupBalances.dc.html", "AddExpense.dc.html", "ScanBill.dc.html", "SettleUp.dc.html", "SettleUpIOS.dc.html", "PaymentCheck.dc.html", "Activity.dc.html", "Profile.dc.html"],
+ "notes": {},
+ "designSystems": [
+  {"title": "SplitIt", "namespace": "splitit", "artifact": "https://claude.ai/artifact/N5mB7ujRueUVtj7h7PDvdf", "version": "1794381538-4222", "copiedAt": "2026-11-11T07:40:00Z"}
+ ]
+}

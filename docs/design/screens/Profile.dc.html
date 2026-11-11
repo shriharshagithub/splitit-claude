@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Profile and settings</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anek+Latin:wght@600;700&family=JetBrains+Mono:wght@500;600&family=Mukta:wght@400;500;600&display=swap">
+<style>
+body{margin:0}
+a{color:#2b2f8f}a:hover{color:#15163a}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #f5f5fb; color: #15163a; font-family: Mukta, 'Noto Sans', system-ui, sans-serif; display: flex; flex-direction: column; overflow: hidden">
+  <div style="padding: 24px 16px 8px">
+    <h1 style="margin: 0; font-family: 'Anek Latin', system-ui, sans-serif; font-size: 22px; line-height: 28px; font-weight: 600">Profile</h1>
+  </div>
+
+  <div style="display: flex; align-items: center; gap: 16px; padding: 8px 16px 16px">
+    <span style="width: 64px; height: 64px; flex: none; border-radius: 999px; background: #e4e5f8; color: #2b2f8f; font-size: 22px; line-height: 64px; font-weight: 600; text-align: center">PS</span>
+    <button style="min-height: 40px; padding: 0 16px; border-radius: 14px; background: #ffffff; color: #2b2f8f; border: 1px solid #84869f; font-family: Mukta, sans-serif; font-size: 14px; line-height: 20px; font-weight: 600">Change photo</button>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 12px; padding: 0 16px">
+    <div style="display: flex; flex-direction: column; gap: 4px">
+      <label for="pn" style="font-size: 14px; line-height: 20px; font-weight: 500">Full name</label>
+      <input id="pn" value="Priya Sharma" style="font-family: Mukta, sans-serif; font-size: 16px; line-height: 24px; color: #15163a; background: #ffffff; border: 1px solid #84869f; border-radius: 8px; min-height: 48px; padding: 0 12px; box-sizing: border-box">
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 4px">
+      <label for="pp" style="font-size: 14px; line-height: 20px; font-weight: 500">Phone</label>
+      <input id="pp" type="tel" value="+91 98860 54321" style="font-family: Mukta, sans-serif; font-size: 16px; line-height: 24px; color: #15163a; background: #ffffff; border: 1px solid #84869f; border-radius: 8px; min-height: 48px; padding: 0 12px; box-sizing: border-box">
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 4px">
+      <label for="pe" style="font-size: 14px; line-height: 20px; font-weight: 500">Email</label>
+      <input id="pe" type="email" value="priya.sharma@gmail.com" style="font-family: Mukta, sans-serif; font-size: 16px; line-height: 24px; color: #15163a; background: #ffffff; border: 1px solid #84869f; border-radius: 8px; min-height: 48px; padding: 0 12px; box-sizing: border-box">
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 4px">
+      <label for="pu" style="font-size: 14px; line-height: 20px; font-weight: 500">UPI ID</label>
+      <input id="pu" value="priya.sharma@oksbi" style="font-family: 'JetBrains Mono', monospace; font-size: 16px; line-height: 24px; color: #15163a; background: #ffffff; border: 1px solid #84869f; border-radius: 8px; min-height: 48px; padding: 0 12px; box-sizing: border-box">
+      <span style="font-size: 13px; line-height: 18px; color: #54567a">Friends pay you here. Without it, they can only settle in cash.</span>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 4px">
+      <span id="remlbl" style="font-size: 14px; line-height: 20px; font-weight: 500">Remind me about money I owe</span>
+      <div role="group" aria-labelledby="remlbl" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; background: #e9eaf4; padding: 4px; border-radius: 14px">
+        <sc-for list="{{freq}}" as="f" hint-placeholder-count="3">
+          <button aria-pressed="{{f.pressed}}" onClick="{{f.pick}}" style="{{f.style}}">{{f.label}}</button>
+        </sc-for>
+      </div>
+      <span style="font-size: 13px; line-height: 18px; color: #54567a">{{freqHelp}}</span>
+    </div>
+  </div>
+
+  <div style="flex: 1"></div>
+  <div style="padding: 12px 16px 12px; display: flex; flex-direction: column; gap: 4px">
+    <button style="min-height: 48px; border-radius: 14px; border: 0; background: #2b2f8f; color: #ffffff; font-family: Mukta, sans-serif; font-size: 16px; line-height: 24px; font-weight: 600">Save changes</button>
+    <a href="Auth.dc.html" style="min-height: 48px; display: flex; align-items: center; justify-content: center; text-decoration: none; color: #a8123a; font-size: 16px; line-height: 24px; font-weight: 600">Log out</a>
+  </div>
+  <nav aria-label="Main" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); background: #ffffff; border-top: 1px solid #d6d7e6; height: 72px; padding-bottom: 8px; box-sizing: border-box">
+    <a href="Main.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; text-decoration: none; color: #54567a; font-size: 13px; line-height: 18px; font-weight: 500">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#54567a" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="4"></circle><path d="M2 21a7 7 0 0 1 14 0"></path><path d="M16 4a4 4 0 0 1 0 8"></path><path d="M22 21a7 7 0 0 0-4-6.3"></path></svg>
+      Groups
+    </a>
+    <a href="Activity.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; text-decoration: none; color: #54567a; font-size: 13px; line-height: 18px; font-weight: 500">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#54567a" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
+      Activity
+    </a>
+    <a href="Profile.dc.html" aria-current="page" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; text-decoration: none; color: #2b2f8f; font-size: 13px; line-height: 18px; font-weight: 600">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2b2f8f" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21a8 8 0 0 1 16 0"></path></svg>
+      Profile
+    </a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { freq: 'weekly' }; }
+  renderVals() {
+    var self = this, cur = this.state.freq;
+    var seg = 'min-height: 40px; border: 0; border-radius: 8px; font-family: Mukta, sans-serif; font-size: 14px; line-height: 20px; font-weight: 500; cursor: pointer; ';
+    var help = { daily: 'Every morning while a debt is more than 3 days old.', weekly: 'Once a week while a debt is more than 3 days old.', off: 'No reminders. You still see what you owe on Home.' };
+    return {
+      freqHelp: help[cur],
+      freq: [['daily', 'Daily'], ['weekly', 'Weekly'], ['off', 'Off']].map(function (x) {
+        var on = x[0] === cur;
+        return { label: x[1], pressed: on ? 'true' : 'false',
+          style: seg + (on ? 'background: #ffffff; color: #15163a; box-shadow: 0 0 0 1px #d6d7e6' : 'background: transparent; color: #54567a'),
+          pick: function () { self.setState({ freq: x[0] }); } };
+      })
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -14,11 +14,22 @@
     "stage": "design",
     "model": "claude-fable-5-2",
     "first": "2026-11-11T07:15:47.950Z",
-    "last": "2026-11-11T07:19:12.275Z",
-    "input_tokens": 14,
-    "cache_creation_input_tokens": 66527,
-    "cache_read_input_tokens": 962427,
-    "output_tokens": 20383,
-    "requests": 6
+    "last": "2026-11-11T07:48:24.514Z",
+    "input_tokens": 26,
+    "cache_creation_input_tokens": 73402,
+    "cache_read_input_tokens": 1989962,
+    "output_tokens": 24989,
+    "requests": 11
+  },
+  {
+    "stage": "design",
+    "model": "claude-opus-5-5",
+    "first": "2026-11-11T07:15:47.950Z",
+    "last": "2026-11-11T07:48:24.514Z",
+    "input_tokens": 30,
+    "cache_creation_input_tokens": 220315,
+    "cache_read_input_tokens": 3922208,
+    "output_tokens": 63100,
+    "requests": 17
   }
 ]
