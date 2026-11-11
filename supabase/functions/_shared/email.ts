@@ -1,5 +1,5 @@
 const APP_URL = (Deno.env.get('APP_URL') ?? 'https://shriharshagithub.github.io/splitit-claude').replace(/\/$/, '');
-const FROM = Deno.env.get('RESEND_FROM') ?? 'SplitIt <onboarding@resend.dev>';
+const FROM = Deno.env.get('RESEND_FROM') ?? 'SplitIt <hello@thewowlabzteam.site>';
 
 export const appLink = (path: string) => `${APP_URL}${path}`;
 
