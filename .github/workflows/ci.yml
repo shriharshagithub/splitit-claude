@@ -1,0 +1,20 @@
+name: CI
+on:
+  push:
+    branches: [main, 'claude/**']
+  pull_request:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - name: Type-check
+        run: npx tsc --noEmit
+      - name: Unit tests (money, splits, simplification, bill parsing, offline queue)
+        run: npx vitest run
+      - name: Edge-function copies of shared code are up to date
+        run: node scripts/sync-shared.mjs && git diff --exit-code supabase/functions/_shared/core

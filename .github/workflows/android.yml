@@ -1,0 +1,36 @@
+# Builds an installable Android APK without any paid build service.
+# Download it from the run's "Artifacts" section.
+name: Android APK
+on:
+  push:
+    branches: [main, 'claude/**']
+    paths-ignore: ['docs/**', 'supabase/**', '**.md']
+  workflow_dispatch:
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      EXPO_PUBLIC_SUPABASE_URL: https://lzczfbpiolguerdbsvjy.supabase.co
+      EXPO_PUBLIC_SUPABASE_KEY: sb_publishable_CxlMuxufV1STW8gDdlED8A_kOSXuSxX
+      EXPO_PUBLIC_SENTRY_DSN: ${{ vars.SENTRY_DSN }}
+      SENTRY_DISABLE_AUTO_UPLOAD: 'true'
+      NODE_OPTIONS: --max-old-space-size=6144
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - uses: gradle/actions/setup-gradle@v4
+      - run: npm ci
+      - name: Generate the native Android project
+        run: npx expo prebuild --platform android --no-install
+      - name: Build release APK (signed with the debug key for side-loading)
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a,armeabi-v7a
+      - uses: actions/upload-artifact@v4
+        with:
+          name: splitit-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 30
