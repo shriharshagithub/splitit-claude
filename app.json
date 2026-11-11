@@ -54,7 +54,8 @@
           "photosPermission": "SplitIt reads photos of bills you choose to scan."
         }
       ],
-      "./plugins/withUpiQueries.js"
+      "./plugins/withUpiQueries.js",
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": false,

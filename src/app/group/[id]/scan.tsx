@@ -7,7 +7,7 @@ import { useMemo, useState } from 'react';
 import { Platform, TextInput, View } from 'react-native';
 import { Chip } from '@/components/Chip';
 import { Button, Card, Field, IconButton, Loading, Money, Screen, T } from '@/components/ui';
-import { computeReceiptSplits, formatINR, parseRupees } from '@/core';
+import { computeReceiptSplits, formatINR, localToday, parseRupees } from '@/core';
 import { saveExpense, scanBill } from '@/lib/api';
 import { useMe } from '@/lib/auth';
 import { errText } from '@/lib/errors';
@@ -103,7 +103,7 @@ export default function ScanBill() {
     try {
       await saveExpense({
         id: Crypto.randomUUID(), group_id: groupId, paid_by: paidBy, total_amount: parsed.total!, description: description.trim(),
-        category: 'food', expense_date: new Date().toISOString().slice(0, 10), split_type: 'exact',
+        category: 'food', expense_date: localToday(), split_type: 'exact',
         inputs: parsed.splits.map((s) => ({ user_id: s.userId, value: s.amount })),
         receipt_path: receiptPath,
         receipt_items: parsed.its!.map((i) => ({ name: i.name, amount: i.amount as number, user_ids: i.assignees })),

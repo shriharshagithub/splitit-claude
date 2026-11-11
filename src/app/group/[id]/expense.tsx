@@ -5,8 +5,9 @@ import { Check, Minus, Plus } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, TextInput, View } from 'react-native';
 import { Chip } from '@/components/Chip';
+import { DateField } from '@/components/DateField';
 import { Avatar, Button, Card, ErrorView, Field, Loading, Money, Row, Screen, Segmented, T } from '@/components/ui';
-import { computeSplits, formatINR, parseRupees, type SplitInput, type SplitType } from '@/core';
+import { computeSplits, formatINR, localToday, parseRupees, type SplitInput, type SplitType } from '@/core';
 import { getExpense } from '@/lib/api';
 import { useMe } from '@/lib/auth';
 import { errText } from '@/lib/errors';
@@ -20,15 +21,6 @@ const CATEGORIES = [
   ['utilities', 'Bills'], ['entertainment', 'Fun'], ['shopping', 'Shopping'], ['general', 'Other'],
 ] as const;
 
-const today = () => new Date().toISOString().slice(0, 10);
-const toDisplayDate = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
-function fromDisplayDate(s: string): string | null {
-  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s.trim());
-  if (!m) return null;
-  const iso = `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
-  const d = new Date(`${iso}T00:00:00`);
-  return Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== iso ? null : iso;
-}
 /** "33.33" -> 3333 basis points; null if invalid. */
 function parsePercent(s: string): number | null {
   const m = /^(\d{1,3})(?:\.(\d{0,2}))?$/.exec(s.trim() || '0');
@@ -48,7 +40,7 @@ export default function ExpenseScreen() {
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('food');
-  const [dateText, setDateText] = useState(toDisplayDate(today()));
+  const [date, setDate] = useState(localToday());
   const [paidBy, setPaidBy] = useState(me);
   const [splitType, setSplitType] = useState<SplitType>('equal');
   const [included, setIncluded] = useState<Record<string, boolean>>({});
@@ -74,7 +66,7 @@ export default function ExpenseScreen() {
       setAmount((src.total_amount / 100).toFixed(2));
       setDescription(src.description);
       setCategory(src.category);
-      setDateText(toDisplayDate(src.expense_date));
+      setDate(src.expense_date);
       setPaidBy(src.paid_by);
       setSplitType(src.split_type);
       const inp = Object.fromEntries((src.split_inputs ?? []).map((x) => [x.user_id, x.value ?? 0]));
@@ -125,10 +117,8 @@ export default function ExpenseScreen() {
 
   const save = async () => {
     setError(null);
-    const date = fromDisplayDate(dateText);
     if (!description.trim()) return setError('Add a short description.');
-    if (!date) return setError('Enter the date as DD/MM/YYYY.');
-    if (date > today()) return setError('The date cannot be in the future.');
+    if (date > localToday()) return setError('The date cannot be in the future.');
     if (!preview?.ok || !total || !inputs) return setError(status?.text ?? 'Check the split.');
     setBusy(true);
     try {
@@ -186,7 +176,7 @@ export default function ExpenseScreen() {
           {CATEGORIES.map(([v, l]) => <Chip key={v} label={l} on={category === v} onPress={() => !ro && setCategory(v)} />)}
         </View>
       </View>
-      <Field label="Date" value={dateText} onChangeText={setDateText} placeholder="DD/MM/YYYY" keyboardType="numbers-and-punctuation" editable={!ro} />
+      <DateField label="Date" value={date} onChange={setDate} editable={!ro} />
       <View style={{ gap: space[2] }}>
         <T v="label">Paid by</T>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
