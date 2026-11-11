@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
-import { ChevronLeft, X } from 'lucide-react-native';
-import type { ReactNode } from 'react';
+import { ChevronLeft, Eye, EyeOff, X } from 'lucide-react-native';
+import { useState, type ReactNode } from 'react';
 import {
   ActivityIndicator, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput,
   View, type StyleProp, type TextInputProps, type TextProps, type TextStyle, type ViewStyle,
@@ -100,21 +100,34 @@ export function Button({ label, onPress, variant = 'primary', disabled, loading,
   );
 }
 
-export function Field({ label, error, help, amount, style, ...props }: TextInputProps & { label: string; error?: string | null; help?: string; amount?: boolean }) {
+export function Field({ label, error, help, amount, style, secureTextEntry, ...props }: TextInputProps & { label: string; error?: string | null; help?: string; amount?: boolean }) {
   const c = useColors();
+  const [reveal, setReveal] = useState(false);
   return (
     <View style={{ gap: space[1] }}>
       <T v="label">{label}</T>
-      <TextInput
-        accessibilityLabel={label}
-        placeholderTextColor={c.muted}
-        style={[
-          amount ? type.amountLg : type.body,
-          s.input, { color: c.ink, backgroundColor: c.surface, borderColor: error ? c.danger : c.lineStrong },
-          style,
-        ]}
-        {...props}
-      />
+      <View style={{ justifyContent: 'center' }}>
+        <TextInput
+          accessibilityLabel={label}
+          placeholderTextColor={c.muted}
+          secureTextEntry={secureTextEntry && !reveal}
+          autoCapitalize={secureTextEntry ? 'none' : props.autoCapitalize}
+          autoCorrect={secureTextEntry ? false : props.autoCorrect}
+          style={[
+            amount ? type.amountLg : type.body,
+            s.input, { color: c.ink, backgroundColor: c.surface, borderColor: error ? c.danger : c.lineStrong },
+            secureTextEntry ? { paddingRight: 52 } : null,
+            style,
+          ]}
+          {...props}
+        />
+        {secureTextEntry ? (
+          <Pressable accessibilityRole="button" accessibilityLabel={reveal ? 'Hide password' : 'Show password'} onPress={() => setReveal(!reveal)}
+            style={{ position: 'absolute', right: 0, width: 48, height: 48, alignItems: 'center', justifyContent: 'center' }}>
+            {reveal ? <EyeOff size={20} color={c.muted} /> : <Eye size={20} color={c.muted} />}
+          </Pressable>
+        ) : null}
+      </View>
       {error ? <T v="caption" color="danger">{error}</T> : help ? <T v="caption" color="muted">{help}</T> : null}
     </View>
   );
