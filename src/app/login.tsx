@@ -6,7 +6,7 @@ import { Button, Field, Screen, Segmented, SplitDisc, T } from '@/components/ui'
 import { acceptInvite, invitePreview, loginWithPhone, sendPasswordReset, signUp } from '@/lib/api';
 import { toAppError } from '@/lib/errors';
 import { authRedirect, WEB_URL } from '@/lib/links';
-import { supabase } from '@/lib/supabase';
+import { supabase, SUPABASE_KEY, SUPABASE_URL } from '@/lib/supabase';
 import { space, useColors } from '@/theme';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -25,6 +25,15 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [invite, setInvite] = useState<{ group_name: string; invited_by: string } | null>(null);
+
+  // Only offer Google sign-in when it is switched on in Supabase Auth.
+  const [googleOn, setGoogleOn] = useState(false);
+  useEffect(() => {
+    fetch(`${SUPABASE_URL}/auth/v1/settings`, { headers: { apikey: SUPABASE_KEY } })
+      .then((r) => r.json())
+      .then((d) => setGoogleOn(Boolean(d?.external?.google)))
+      .catch(() => setGoogleOn(false));
+  }, []);
 
   useEffect(() => {
     if (params.invite) invitePreview(params.invite).then((p) => p && !p.accepted && setInvite(p)).catch(() => undefined);
@@ -117,7 +126,7 @@ export default function Login() {
         {mode === 'forgot' && <Button variant="quiet" label="Back to log in" onPress={() => { setMode('login'); setInfo(null); }} />}
       </View>
 
-      {mode !== 'forgot' && (
+      {mode !== 'forgot' && googleOn && (
         <View style={{ gap: space[3] }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[3] }}>
             <View style={{ flex: 1, height: 1, backgroundColor: c.line }} /><T v="caption" color="muted">or</T><View style={{ flex: 1, height: 1, backgroundColor: c.line }} />
