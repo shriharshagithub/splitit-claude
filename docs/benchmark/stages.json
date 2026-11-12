@@ -1,0 +1,6 @@
+[
+  {"name": "0-false-start", "start": "2026-11-12T06:34:00Z", "note": "audited the old build before the owner clarified 'build fresh'"},
+  {"name": "1-plan", "start": "2026-11-12T06:50:39Z"},
+  {"name": "2-design", "start": "2026-11-12T06:53:00Z"},
+  {"name": "3-build", "start": "2026-11-12T06:54:00Z"}
+]
