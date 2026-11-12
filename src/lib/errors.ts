@@ -1,33 +1,11 @@
-/** An error whose message is safe and useful to show to the user. */
-export class AppError extends Error {
-  constructor(message: string, public kind: 'user' | 'network' | 'auth' | 'unknown' = 'user') {
-    super(message);
-  }
-}
-
-const NETWORK = /network request failed|failed to fetch|load failed|networkerror|fetch failed|timeout|aborted/i;
-
-export function isNetworkError(e: unknown): boolean {
-  return (e instanceof AppError && e.kind === 'network') || (e instanceof Error && NETWORK.test(e.message));
-}
-
-/** Turn anything thrown by Supabase or fetch into an AppError with a human message. Never shows a stack trace. */
-export function toAppError(e: unknown): AppError {
-  if (e instanceof AppError) return e;
-  const anyE = e as { message?: string; code?: string; status?: number } | null;
-  const msg = anyE?.message ?? '';
-  if (NETWORK.test(msg)) return new AppError('You are offline or the connection dropped. Try again when you are back online.', 'network');
-  if (anyE?.code === 'P0001' && msg) return new AppError(msg, 'user');
-  if (anyE?.code === 'PGRST301' || anyE?.status === 401 || /jwt|refresh token/i.test(msg)) {
-    return new AppError('Your session has ended. Please log in again.', 'auth');
-  }
-  if (/invalid login credentials/i.test(msg)) return new AppError('That email or password is not right.', 'auth');
-  return new AppError('Something went wrong. Please try again.', 'unknown');
-}
-
-/** Message to show for any caught error: our own validation messages pass through, anything else is made safe. */
-export function errText(e: unknown): string {
-  if (e instanceof AppError) return e.message;
-  if (e instanceof Error && e.constructor === Error && e.message && !NETWORK.test(e.message)) return e.message;
-  return toAppError(e).message;
+/** Turns any error into a sentence a person can act on. Never shows stack traces. */
+export function friendlyError(e: unknown): string {
+  const msg = (e as any)?.message ?? String(e ?? '');
+  if (/Failed to fetch|Network request failed|fetch failed|NetworkError|No connection/i.test(msg)) return 'No connection. Check your internet and try again.';
+  if (/JWT|session|refresh token|Please log in/i.test(msg)) return 'Your login has expired. Please log in again.';
+  if (/coerce the result|0 rows|PGRST116/i.test(msg)) return "This doesn't exist, or you don't have access to it.";
+  if (/duplicate key|already exists/i.test(msg)) return 'That already exists.';
+  // Our database functions raise plain-language messages; pass those through.
+  if (msg && msg.length < 200 && !/[{}]|violates|syntax|relation|column|function/i.test(msg)) return msg;
+  return 'Something went wrong. Please try again.';
 }

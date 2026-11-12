@@ -1,23 +1,44 @@
-/** Calendar dates as 'YYYY-MM-DD' strings in the device's local time (India: IST), never UTC. */
-const pad = (n: number) => String(n).padStart(2, '0');
+/** Calendar dates are plain "YYYY-MM-DD" strings in the phone's local time (IST for our users). */
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-export function toIsoDate(d: Date): string {
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+export function toISODate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-export function fromIsoDate(iso: string): Date {
-  const [y, m, d] = iso.split('-').map(Number);
-  return new Date(y, m - 1, d);
+export function todayISO(now = new Date()): string {
+  return toISODate(now);
 }
-
-export const localToday = (now: Date = new Date()) => toIsoDate(now);
 
 export function addDays(iso: string, days: number): string {
-  const d = fromIsoDate(iso);
-  d.setDate(d.getDate() + days);
-  return toIsoDate(d);
+  const [y, m, d] = iso.split('-').map(Number);
+  return toISODate(new Date(y, m - 1, d + days));
 }
 
-const LABEL = new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-/** '2026-11-12' -> '12 Nov 2026' */
-export const formatDate = (iso: string) => LABEL.format(fromIsoDate(iso));
+/** "2026-11-03" -> "3 Nov 2026" */
+export function formatDate(iso: string): string {
+  const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
+  if (!y || !m || !d) return iso;
+  return `${d} ${MONTHS[m - 1]} ${y}`;
+}
+
+/** A timestamp shown in IST regardless of the device time zone: "3 Nov 2026, 9:05 pm IST" */
+export function formatDateTimeIST(ts: string | Date): string {
+  const t = new Date(typeof ts === 'string' ? ts : ts.getTime());
+  const ist = new Date(t.getTime() + 330 * 60_000);
+  const h = ist.getUTCHours();
+  const mm = String(ist.getUTCMinutes()).padStart(2, '0');
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${ist.getUTCDate()} ${MONTHS[ist.getUTCMonth()]} ${ist.getUTCFullYear()}, ${h12}:${mm} ${h < 12 ? 'am' : 'pm'} IST`;
+}
+
+export function monthGrid(year: number, month0: number): (string | null)[] {
+  const first = new Date(year, month0, 1);
+  const lead = (first.getDay() + 6) % 7; // Monday first
+  const days = new Date(year, month0 + 1, 0).getDate();
+  const cells: (string | null)[] = Array(lead).fill(null);
+  for (let d = 1; d <= days; d++) cells.push(toISODate(new Date(year, month0, d)));
+  while (cells.length % 7) cells.push(null);
+  return cells;
+}
+
+export const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];

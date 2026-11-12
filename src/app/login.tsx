@@ -1,139 +1,126 @@
-import * as WebBrowser from 'expo-web-browser';
-import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Platform, View } from 'react-native';
-import { Button, Field, Screen, Segmented, SplitDisc, T } from '@/components/ui';
-import { acceptInvite, invitePreview, loginWithPhone, sendPasswordReset, signUp } from '@/lib/api';
-import { toAppError } from '@/lib/errors';
-import { authRedirect, WEB_URL } from '@/lib/links';
-import { supabase, SUPABASE_KEY, SUPABASE_URL } from '@/lib/supabase';
-import { space, useColors } from '@/theme';
-
-WebBrowser.maybeCompleteAuthSession();
+import { Pressable, View } from 'react-native';
+import { isEmail, normalizeIndianPhone } from '@/core';
+import { Button, ErrorBox, Field, InfoBox, PasswordField, Screen, Segmented, T } from '@/components/ui';
+import { googleEnabled, logIn, sendPasswordReset, signInWithGoogle, signUp } from '@/lib/auth';
+import { friendlyError } from '@/lib/errors';
+import { space, useColors } from '@/lib/theme';
 
 type Mode = 'login' | 'signup' | 'forgot';
 
 export default function Login() {
-  const params = useLocalSearchParams<{ invite?: string; mode?: Mode }>();
   const c = useColors();
-  const [mode, setMode] = useState<Mode>(params.mode ?? (params.invite ? 'signup' : 'login'));
+  const [mode, setMode] = useState<Mode>('login');
+  const [identifier, setIdentifier] = useState('');
   const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
-  const [invite, setInvite] = useState<{ group_name: string; invited_by: string } | null>(null);
+  const [errs, setErrs] = useState<Record<string, string>>({});
+  const [google, setGoogle] = useState<boolean | null>(null);
+  useEffect(() => { googleEnabled().then(setGoogle); }, []);
 
-  // Only offer Google sign-in when it is switched on in Supabase Auth.
-  const [googleOn, setGoogleOn] = useState(false);
-  useEffect(() => {
-    fetch(`${SUPABASE_URL}/auth/v1/settings`, { headers: { apikey: SUPABASE_KEY } })
-      .then((r) => r.json())
-      .then((d) => setGoogleOn(Boolean(d?.external?.google)))
-      .catch(() => setGoogleOn(false));
-  }, []);
-
-  useEffect(() => {
-    if (params.invite) invitePreview(params.invite).then((p) => p && !p.accepted && setInvite(p)).catch(() => undefined);
-  }, [params.invite]);
-
-  const run = async (fn: () => Promise<void>) => {
+  async function go() {
+    setError(null); setInfo(null);
+    const e: Record<string, string> = {};
+    if (mode === 'signup') {
+      if (!name.trim()) e.name = 'Please enter your name.';
+      if (!isEmail(email)) e.email = 'Please enter a valid email address.';
+      if (!normalizeIndianPhone(phone)) e.phone = 'Enter a 10-digit Indian mobile number.';
+      if (password.length < 8) e.password = 'Use at least 8 characters.';
+    } else if (mode === 'login') {
+      if (!identifier.trim()) e.identifier = 'Enter your email or mobile number.';
+      if (!password) e.password = 'Enter your password.';
+    } else if (!isEmail(email)) e.email = 'Please enter a valid email address.';
+    setErrs(e);
+    if (Object.keys(e).length) return;
     setBusy(true);
-    setError(null);
-    setInfo(null);
     try {
-      await fn();
-    } catch (e) {
-      setError(toAppError(e).message);
+      if (mode === 'login') await logIn(identifier, password);
+      else if (mode === 'signup') await signUp({ full_name: name.trim(), email: email.trim(), phone, password });
+      else setInfo(await sendPasswordReset(email.trim()));
+    } catch (err) {
+      setError(friendlyError(err));
     } finally {
       setBusy(false);
     }
-  };
+  }
 
-  const submit = () => run(async () => {
-    if (mode === 'login') {
-      await loginWithPhone(phone, password);
-      if (params.invite) {
-        const g = await acceptInvite(params.invite).catch(() => null);
-        if (g) return void router.replace(`/group/${g}`);
-      }
-      router.replace('/');
-    } else if (mode === 'signup') {
-      await signUp({ full_name: name.trim(), phone, email, password, invite_token: params.invite });
-      router.replace('/');
-    } else {
-      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())) throw new Error('Enter the email on your account.');
-      // Reset links always open the web app, which works on any device; app deep links are not needed.
-      await sendPasswordReset(email, `${WEB_URL}/reset-password`);
-      setInfo('If that email has an account, a reset link is on its way. It works once and expires in an hour.');
-    }
-  });
-
-  const google = () => run(async () => {
-    const redirectTo = authRedirect('/');
-    const { data, error: e } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo, skipBrowserRedirect: Platform.OS !== 'web', queryParams: { prompt: 'select_account' } },
-    });
-    if (e) throw /not enabled|unsupported provider/i.test(e.message) ? new Error('Google sign-in is not set up yet. Use your phone number for now.') : e;
-    if (Platform.OS !== 'web' && data?.url) {
-      const res = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
-      if (res.type === 'success') {
-        const code = new URL(res.url).searchParams.get('code');
-        if (code) {
-          const { error: xe } = await supabase.auth.exchangeCodeForSession(code);
-          if (xe) throw xe;
-          router.replace('/');
-        }
-      }
-    }
-  });
+  async function googleGo() {
+    setError(null);
+    if (google === false) { setError('Google sign-in is not switched on yet. Use email or mobile number for now.'); return; }
+    try { await signInWithGoogle(); } catch (err) { setError(friendlyError(err)); }
+  }
 
   return (
-    <Screen>
-      <View style={{ gap: space[3], paddingTop: space[6] }}>
-        <SplitDisc size={48} />
-        <T v="display" accessibilityRole="header">SplitIt</T>
-        <T color="muted">{invite ? `${invite.invited_by} invited you to ${invite.group_name}. Create your account to join.` : 'One person pays. Everyone settles over UPI.'}</T>
+    <Screen back={false}>
+      <View style={{ alignItems: 'center', gap: space(2), marginTop: space(8), marginBottom: space(4) }}>
+        <Logo />
+        <T v="title">SplitIt</T>
+        <T style={{ textAlign: 'center' }} color={c.muted}>Share expenses with friends. Settle up over UPI.</T>
       </View>
+      {mode !== 'forgot' && (
+        <Segmented label="Log in or sign up" value={mode} onChange={(m) => { setMode(m); setError(null); setErrs({}); }}
+          options={[{ key: 'login', label: 'Log in' }, { key: 'signup', label: 'Sign up' }]} />
+      )}
+      {mode === 'forgot' && <T v="h2">Reset your password</T>}
+
+      {mode === 'login' && (
+        <>
+          <Field label="Email or mobile number" value={identifier} onChangeText={setIdentifier} autoCapitalize="none" autoCorrect={false}
+            keyboardType="email-address" autoComplete="username" placeholder="you@example.com or 98xxx xxxxx" error={errs.identifier} onSubmitEditing={go} />
+          <PasswordField label="Password" value={password} onChangeText={setPassword} autoComplete="current-password" error={errs.password} onSubmitEditing={go} />
+        </>
+      )}
+      {mode === 'signup' && (
+        <>
+          <Field label="Your name" value={name} onChangeText={setName} autoComplete="name" placeholder="Priya Sharma" error={errs.name} />
+          <Field label="Email" value={email} onChangeText={setEmail} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" autoComplete="email" placeholder="you@example.com" error={errs.email} hint="For password reset and payment messages." />
+          <Field label="Mobile number" value={phone} onChangeText={setPhone} keyboardType="phone-pad" autoComplete="tel" placeholder="98xxx xxxxx" error={errs.phone} hint="Friends can add you with this number." />
+          <PasswordField label="Password" value={password} onChangeText={setPassword} autoComplete="new-password" error={errs.password} hint="At least 8 characters." onSubmitEditing={go} />
+        </>
+      )}
+      {mode === 'forgot' && (
+        <>
+          <T color={c.muted}>Enter the email on your account. We will send a link to choose a new password.</T>
+          <Field label="Email" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" autoComplete="email" error={errs.email} onSubmitEditing={go} />
+        </>
+      )}
+
+      <ErrorBox message={error} />
+      {info && <InfoBox tone="ok"><T>{info}</T></InfoBox>}
+      <Button title={mode === 'login' ? 'Log in' : mode === 'signup' ? 'Create account' : 'Send reset link'} onPress={go} loading={busy} />
+
+      {mode === 'login' && (
+        <Pressable accessibilityRole="button" onPress={() => { setMode('forgot'); setError(null); setEmail(identifier.includes('@') ? identifier : ''); }}
+          style={{ minHeight: 48, justifyContent: 'center', alignSelf: 'center' }}>
+          <T v="label" color={c.primary}>Forgot password?</T>
+        </Pressable>
+      )}
+      {mode === 'forgot' && <Button title="Back to log in" variant="ghost" onPress={() => { setMode('login'); setInfo(null); }} />}
 
       {mode !== 'forgot' && (
-        <Segmented value={mode} onChange={(m) => { setMode(m); setError(null); }}
-          options={[{ value: 'login', label: 'Log in' }, { value: 'signup', label: 'Sign up' }]} />
-      )}
-
-      <View style={{ gap: space[4] }}>
-        {mode === 'forgot' && <T v="title">Reset your password</T>}
-        {mode === 'signup' && <Field label="Full name" value={name} onChangeText={setName} autoComplete="name" textContentType="name" />}
-        {mode !== 'forgot' && (
-          <Field label="Phone number" value={phone} onChangeText={setPhone} keyboardType="phone-pad" autoComplete="tel"
-            textContentType="telephoneNumber" placeholder="98450 12345" help={mode === 'signup' ? 'Indian mobile number. You log in with this.' : undefined} />
-        )}
-        {mode !== 'login' && (
-          <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoComplete="email"
-            help={mode === 'signup' ? 'For password resets and payment messages.' : undefined} />
-        )}
-        {mode !== 'forgot' && (
-          <Field label="Password" value={password} onChangeText={setPassword} secureTextEntry autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
-            help={mode === 'signup' ? 'At least 8 characters.' : undefined} onSubmitEditing={submit} />
-        )}
-        {error ? <T color="danger" selectable>{error}</T> : null}
-        {info ? <T color="positive">{info}</T> : null}
-        <Button label={mode === 'login' ? 'Log in' : mode === 'signup' ? 'Create account' : 'Email me a reset link'} onPress={submit} loading={busy} />
-        {mode === 'login' && <Button variant="quiet" label="Forgot password?" onPress={() => { setMode('forgot'); setError(null); }} />}
-        {mode === 'forgot' && <Button variant="quiet" label="Back to log in" onPress={() => { setMode('login'); setInfo(null); }} />}
-      </View>
-
-      {mode !== 'forgot' && googleOn && (
-        <View style={{ gap: space[3] }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[3] }}>
-            <View style={{ flex: 1, height: 1, backgroundColor: c.line }} /><T v="caption" color="muted">or</T><View style={{ flex: 1, height: 1, backgroundColor: c.line }} />
+        <>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space(3) }}>
+            <View style={{ flex: 1, height: 1, backgroundColor: c.border }} /><T v="small">or</T><View style={{ flex: 1, height: 1, backgroundColor: c.border }} />
           </View>
-          <Button variant="secondary" label="Continue with Google" onPress={google} disabled={busy} />
-        </View>
+          <Button title="Continue with Google" variant="secondary" onPress={googleGo} />
+        </>
       )}
     </Screen>
+  );
+}
+
+function Logo() {
+  const c = useColors();
+  return (
+    <View accessibilityLabel="SplitIt logo" style={{ width: 64, height: 64, borderRadius: 32, overflow: 'hidden', flexDirection: 'row', transform: [{ rotate: '-20deg' }] }}>
+      <View style={{ flex: 1, backgroundColor: c.primary }} />
+      <View style={{ width: 4, backgroundColor: c.bg }} />
+      <View style={{ flex: 1, backgroundColor: c.accent }} />
+    </View>
   );
 }

@@ -1,91 +1,72 @@
-// Receives a bill photo, validates it, stores it privately, and extracts line items with OCR.space.
-// Any OCR failure still returns 200 with empty items so the app falls back to manual entry.
-import { adminClient, userClient } from '../_shared/clients.ts';
-import { cors, json, UserError } from '../_shared/http.ts';
-import { captureException } from '../_shared/sentry.ts';
+// Reads a bill photo the app has uploaded to the private "bills" bucket.
+// Checks membership, file type (by its first bytes) and size, then asks OCR.space for the text
+// and parses items, tax, service charge, discount and total. Any failure returns ok:false so the
+// app opens the same screen empty for manual entry.
+import { admin, asUser } from '../_shared/clients.ts';
+import { cors, json } from '../_shared/http.ts';
+import { reportError } from '../_shared/sentry.ts';
 import { parseBillText } from '../_shared/core/billText.ts';
 
-const MAX_BYTES = 10 * 1024 * 1024;
-const OCR_FREE_LIMIT = 1024 * 1024; // OCR.space free tier rejects files over 1 MB
+const MAX = 10 * 1024 * 1024;
+const OCR_LIMIT = 1024 * 1024; // OCR.space free tier
 
-function sniff(b: Uint8Array): 'image/jpeg' | 'image/png' | null {
-  if (b.length > 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'image/jpeg';
-  if (b.length > 8 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47 && b[4] === 0x0d && b[5] === 0x0a && b[6] === 0x1a && b[7] === 0x0a) return 'image/png';
+function kind(b: Uint8Array): 'jpeg' | 'png' | null {
+  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'jpeg';
+  if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return 'png';
   return null;
 }
 
-function toBase64(bytes: Uint8Array): string {
+function b64(bytes: Uint8Array): string {
   let s = '';
   for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
   return btoa(s);
 }
 
-async function ocr(bytes: Uint8Array, mime: string): Promise<{ text: string | null; message?: string }> {
-  const key = Deno.env.get('OCR_SPACE_API_KEY');
-  if (!key) return { text: null, message: 'Automatic reading is not set up yet. Enter the items below.' };
-  if (bytes.length > OCR_FREE_LIMIT) return { text: null, message: 'This photo is too large to read automatically. Enter the items below.' };
-  const form = new FormData();
-  form.append('base64Image', `data:${mime};base64,${toBase64(bytes)}`);
-  form.append('OCREngine', '2');
-  form.append('isTable', 'true');
-  form.append('scale', 'true');
-  form.append('detectOrientation', 'true');
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 25000);
-  try {
-    const res = await fetch('https://api.ocr.space/parse/image', { method: 'POST', headers: { apikey: key }, body: form, signal: ctrl.signal });
-    const out = await res.json();
-    if (out?.IsErroredOnProcessing || !out?.ParsedResults?.length) {
-      return { text: null, message: 'We could not read this bill. Enter the items below.' };
-    }
-    return { text: out.ParsedResults.map((r: { ParsedText?: string }) => r.ParsedText ?? '').join('\n') };
-  } catch {
-    return { text: null, message: 'Reading the bill took too long. Enter the items below.' };
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
+  let path = '';
   try {
-    if (req.method !== 'POST') throw new UserError('Use POST.', 405);
-    const form = await req.formData().catch(() => null);
-    const file = form?.get('file');
-    const groupId = String(form?.get('group_id') ?? '');
-    if (!(file instanceof File)) throw new UserError('Attach a photo of the bill.');
-    if (!/^[0-9a-f-]{36}$/.test(groupId)) throw new UserError('Choose a group first.');
-    if (file.size > MAX_BYTES) throw new UserError('The photo must be 10 MB or smaller.', 413);
+    const user = asUser(req);
+    const { data: auth } = await user.auth.getUser();
+    if (!auth?.user) return json({ ok: false, reason: 'Please log in again.' }, 401);
+    const b = await req.json().catch(() => ({}));
+    path = String(b.path ?? '');
+    const groupId = path.split('/')[0];
+    const { data: member } = await user.rpc('is_member', { gid: groupId });
+    if (member !== true) return json({ ok: false, reason: 'You are not in this group.' }, 403);
 
-    const user = userClient(req);
-    const { data: member, error: memberErr } = await user.rpc('is_member', { g: groupId });
-    if (memberErr || member !== true) throw new UserError('You are not a member of this group.', 403);
-
+    const { data: file, error } = await admin().storage.from('bills').download(path);
+    if (error || !file) return json({ ok: false, reason: 'Could not find the uploaded photo.' }, 404);
     const bytes = new Uint8Array(await file.arrayBuffer());
-    if (bytes.length > MAX_BYTES) throw new UserError('The photo must be 10 MB or smaller.', 413);
-    const mime = sniff(bytes);
-    if (!mime) throw new UserError('Upload a JPEG or PNG photo.', 415);
+    if (bytes.length > MAX) return json({ ok: false, reason: 'That photo is over 10 MB.' }, 413);
+    const k = kind(bytes);
+    if (!k) {
+      await admin().storage.from('bills').remove([path]);
+      return json({ ok: false, reason: 'Only JPEG or PNG photos can be read.' }, 415);
+    }
+    if (bytes.length > OCR_LIMIT) return json({ ok: false, reason: 'The photo is too large to read automatically. Enter the items by hand.' });
 
-    const path = `${groupId}/${crypto.randomUUID()}.${mime === 'image/png' ? 'png' : 'jpg'}`;
-    const { error: upErr } = await adminClient().storage.from('receipts').upload(path, bytes, { contentType: mime });
-    if (upErr) throw upErr;
-
-    const { text, message } = await ocr(bytes, mime);
-    const parsed = text ? parseBillText(text) : null;
-    const found = parsed && parsed.items.length > 0;
-    return json({
-      receipt_path: path,
-      ocr_ok: Boolean(found),
-      message: found ? null : (message ?? 'We could not find any items on this bill. Enter them below.'),
-      items: parsed?.items ?? [],
-      tax: parsed?.tax ?? 0,
-      service_charge: parsed?.serviceCharge ?? 0,
-      discount: parsed?.discount ?? 0,
-      printed_total: parsed?.printedTotal ?? null,
+    const form = new FormData();
+    form.append('base64Image', `data:image/${k};base64,${b64(bytes)}`);
+    form.append('language', 'eng');
+    form.append('isTable', 'true');
+    form.append('scale', 'true');
+    form.append('OCREngine', '2');
+    const r = await fetch('https://api.ocr.space/parse/image', {
+      method: 'POST', headers: { apikey: Deno.env.get('OCR_SPACE_API_KEY') || 'helloworld' }, body: form,
+      signal: AbortSignal.timeout(25000),
     });
+    const out = await r.json().catch(() => null);
+    const text: string = out?.ParsedResults?.map((p: { ParsedText?: string }) => p.ParsedText ?? '').join('\n') ?? '';
+    if (!r.ok || out?.IsErroredOnProcessing || !text.trim()) {
+      console.warn('ocr failed', r.status, JSON.stringify(out)?.slice(0, 500));
+      return json({ ok: false, reason: 'We could not read this bill. Enter the items by hand.' });
+    }
+    const bill = parseBillText(text);
+    if (bill.items.length === 0) return json({ ok: false, reason: 'We could not find any items on this bill. Enter them by hand.', text });
+    return json({ ok: true, ...bill, receipt_path: path });
   } catch (e) {
-    if (e instanceof UserError) return json({ error: e.message }, e.status);
-    await captureException(e, { function: 'scan-bill' });
-    return json({ error: 'Something went wrong while uploading the bill. Please try again.' }, 500);
+    await reportError(e, 'scan-bill', { path });
+    return json({ ok: false, reason: 'We could not read this bill. Enter the items by hand.' });
   }
 });

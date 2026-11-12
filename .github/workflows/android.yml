@@ -1,18 +1,15 @@
-# Builds an installable Android APK without any paid build service.
-# Download it from the run's "Artifacts" section.
+# Builds an installable Android APK on GitHub's machines (no paid build service) and attaches it to the run.
+# Download: Actions → "Android APK" → latest run → Artifacts → splitit-apk.
 name: Android APK
 on:
   push:
-    branches: [main, 'claude/**']
-    paths-ignore: ['docs/**', 'supabase/**', '**.md']
+    paths-ignore: ['docs/**', '**.md', 'supabase/**', 'tests/**']
   workflow_dispatch:
 jobs:
   apk:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
-      EXPO_PUBLIC_SUPABASE_URL: https://lzczfbpiolguerdbsvjy.supabase.co
-      EXPO_PUBLIC_SUPABASE_KEY: sb_publishable_CxlMuxufV1STW8gDdlED8A_kOSXuSxX
       EXPO_PUBLIC_SENTRY_DSN: ${{ vars.SENTRY_DSN }}
       SENTRY_DISABLE_AUTO_UPLOAD: 'true'
       NODE_OPTIONS: --max-old-space-size=6144
@@ -26,7 +23,9 @@ jobs:
       - run: npm ci
       - name: Generate the native Android project
         run: npx expo prebuild --platform android --no-install
-      - name: Build release APK (signed with the debug key for side-loading)
+      - name: Check the UPI app query is in the Android manifest
+        run: grep -q 'android:scheme="upi"' android/app/src/main/AndroidManifest.xml
+      - name: Build the APK (signed with the debug key, for installing directly)
         working-directory: android
         run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a,armeabi-v7a
       - uses: actions/upload-artifact@v4

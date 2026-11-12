@@ -1,51 +1,82 @@
-// Daily job (pg_cron, 09:00 IST). For each simplified debt whose debtor has owed money for more
-// than 3 days, sends one reminder per the debtor's preference (daily / weekly / off). Settled debts
-// drop out of the balance set, so their reminders stop on their own. Also nudges receivers who have
-// left a payment claim unanswered for 3 days.
-import { adminClient, verifyHook } from '../_shared/clients.ts';
-import { json } from '../_shared/http.ts';
-import { captureException } from '../_shared/sentry.ts';
+// Daily at 09:00 IST (pg_cron -> pg_net -> here).
+// 1. Reminds anyone who has owed money in a group for more than 3 days (daily, weekly or off, per person).
+// 2. Nudges, once, anyone who has not confirmed or declined a payment claim within 3 days.
+// Every reminder is a notification, which the database also emails.
+import { admin, checkHookSecret } from '../_shared/clients.ts';
+import { cors, json } from '../_shared/http.ts';
+import { reportError } from '../_shared/sentry.ts';
 import { simplifyDebts } from '../_shared/core/simplify.ts';
+import { formatINR } from '../_shared/core/money.ts';
 
-const DAY = 24 * 3600 * 1000;
-const GAP = { daily: 20 * 3600 * 1000, weekly: 6 * DAY + 20 * 3600 * 1000 } as const;
-
-interface Row {
-  group_id: string; group_name: string; user_id: string; full_name: string; net: number;
-  debt_since: string | null; frequency: 'daily' | 'weekly' | 'off'; last_reminded: string | null;
-}
+const DAY = 86_400_000;
 
 Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
+  if (!(await checkHookSecret(req))) return json({ error: 'forbidden' }, 403);
   try {
-    if (!(await verifyHook(req))) return json({ error: 'forbidden' }, 403);
-    const db = adminClient();
+    const db = admin();
     const now = Date.now();
-    const { data, error } = await db.rpc('_reminder_inputs');
+    const { data: rows, error } = await db.rpc('reminder_candidates');
     if (error) throw error;
 
-    const byGroup = new Map<string, Row[]>();
-    for (const r of (data ?? []) as Row[]) byGroup.set(r.group_id, [...(byGroup.get(r.group_id) ?? []), r]);
+    type Row = { group_id: string; group_name: string; user_id: string; net: number; oldest_debt: string | null };
+    const groups = new Map<string, { name: string; rows: Row[] }>();
+    for (const r of (rows ?? []) as Row[]) {
+      if (!groups.has(r.group_id)) groups.set(r.group_id, { name: r.group_name, rows: [] });
+      groups.get(r.group_id)!.rows.push(r);
+    }
+    const userIds = [...new Set(((rows ?? []) as Row[]).map((r) => r.user_id))];
+    const { data: profiles } = await db.from('profiles').select('id, full_name, reminder_freq').in('id', userIds.length ? userIds : ['00000000-0000-0000-0000-000000000000']);
+    const prof = new Map((profiles ?? []).map((p) => [p.id, p]));
 
-    const sent: { group: string; debtor: string; creditor: string; amount: number }[] = [];
-    const skipped: Record<string, number> = { too_recent_debt: 0, preference_off: 0, reminded_recently: 0 };
-    for (const [groupId, rows] of byGroup) {
-      const nets = Object.fromEntries(rows.map((r) => [r.user_id, Number(r.net)]));
-      const info = new Map(rows.map((r) => [r.user_id, r]));
+    let reminded = 0, skipped = 0;
+    for (const [gid, g] of groups) {
+      const nets: Record<string, number> = {};
+      const oldest: Record<string, string | null> = {};
+      for (const r of g.rows) { nets[r.user_id] = Number(r.net); oldest[r.user_id] = r.oldest_debt; }
       for (const t of simplifyDebts(nets)) {
-        const d = info.get(t.from)!;
-        if (!d.debt_since || now - Date.parse(d.debt_since) < 3 * DAY) { skipped.too_recent_debt++; continue; }
-        if (d.frequency === 'off') { skipped.preference_off++; continue; }
-        if (d.last_reminded && now - Date.parse(d.last_reminded) < GAP[d.frequency]) { skipped.reminded_recently++; continue; }
-        const { error: e } = await db.rpc('_send_reminder', { g: groupId, debtor: t.from, creditor: t.to, amt: t.amount });
-        if (e) throw e;
-        sent.push({ group: d.group_name, debtor: d.full_name, creditor: info.get(t.to)?.full_name ?? '', amount: t.amount });
+        const debtor = prof.get(t.from);
+        const since = oldest[t.from] ? Date.parse(oldest[t.from]!) : now;
+        if (!debtor || debtor.reminder_freq === 'off' || now - since < 3 * DAY) { skipped++; continue; }
+        const gap = debtor.reminder_freq === 'weekly' ? 6.5 * DAY : 0.75 * DAY;
+        const { data: last } = await db.from('reminders').select('sent_at').eq('group_id', gid).eq('debtor_user_id', t.from).eq('creditor_user_id', t.to)
+          .eq('status', 'sent').order('sent_at', { ascending: false }).limit(1).maybeSingle();
+        if (last?.sent_at && now - Date.parse(last.sent_at) < gap) { skipped++; continue; }
+        const creditor = prof.get(t.to)?.full_name || 'Your friend';
+        await db.from('reminders').insert({ group_id: gid, debtor_user_id: t.from, creditor_user_id: t.to, amount: t.amount, sent_at: new Date().toISOString(), status: 'sent' });
+        await db.from('notifications').insert({
+          user_id: t.from, group_id: gid, type: 'reminder',
+          title: `Reminder: you owe ${creditor} ${formatINR(t.amount)}`,
+          body: `You owe ${creditor} ${formatINR(t.amount)} for ${g.name}. Pay over UPI or in cash from SplitIt.`,
+          payload: { group_id: gid, to_user: t.to, amount: t.amount },
+        });
+        await db.from('activity').insert({ group_id: gid, actor: null, kind: 'reminder_sent', summary: `Reminder sent to ${debtor.full_name} for ${formatINR(t.amount)} owed to ${creditor}` });
+        reminded++;
       }
     }
-    const { data: nudged, error: nErr } = await db.rpc('_nudge_unconfirmed');
-    if (nErr) throw nErr;
-    return json({ ran_at: new Date(now).toISOString(), reminders_sent: sent.length, sent, skipped, confirm_nudges: nudged });
+
+    // Unanswered payment claims
+    const { data: stale } = await db.from('settlements').select('id, group_id, from_user, to_user, amount, method, upi_ref')
+      .eq('status', 'marked_paid').is('nudged_at', null).lt('marked_paid_at', new Date(now - 3 * DAY).toISOString());
+    let nudged = 0;
+    for (const s of stale ?? []) {
+      const [{ data: payer }, { data: grp }] = await Promise.all([
+        db.from('profiles').select('full_name').eq('id', s.from_user).single(),
+        db.from('groups').select('name').eq('id', s.group_id).single(),
+      ]);
+      await db.from('notifications').insert({
+        user_id: s.to_user, group_id: s.group_id, type: 'confirm_nudge',
+        title: `Did ${payer?.full_name ?? 'your friend'} pay you ${formatINR(s.amount)}?`,
+        body: `${payer?.full_name ?? 'Your friend'} said they paid you ${formatINR(s.amount)} ${s.method === 'cash' ? 'in cash' : 'via UPI'} for ${grp?.name} 3 days ago.${s.upi_ref ? ` Ref: ${s.upi_ref}.` : ''} Please confirm or decline so the balance is right.`,
+        payload: { group_id: s.group_id, settlement_id: s.id, amount: s.amount },
+      });
+      await db.from('settlements').update({ nudged_at: new Date().toISOString() }).eq('id', s.id);
+      nudged++;
+    }
+    console.log(JSON.stringify({ reminded, skipped, nudged }));
+    return json({ reminded, skipped, nudged });
   } catch (e) {
-    await captureException(e, { function: 'reminders' });
-    return json({ error: 'failed' }, 500);
+    await reportError(e, 'reminders');
+    return json({ error: String((e as Error).message ?? e) }, 500);
   }
 });

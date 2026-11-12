@@ -1,123 +1,86 @@
--- Demo data. Every seeded account's password is: SplitIt@2026
--- Demo UPI IDs use the non-existent handle @example so a test payment can never reach a real person.
--- Phone login works with the numbers below (10 digits or +91 form).
--- Run as postgres. Expenses and settlements go through the same functions the app uses.
-
+-- SplitIt demo data. Safe to run more than once. Remove it with supabase/clear-demo.sql.
+-- 5 people (password for all: SplitIt@2026), "Goa Trip" (5 people) and "Flat 402" (3 people),
+-- 12 expenses (₹150 to ₹8,000, all four split types), and 3 payments: 1 confirmed, 1 waiting for confirmation, 1 started.
+-- Demo emails use @example.com (they never receive mail) and demo UPI IDs use @example, which no UPI app accepts,
+-- so a test payment can never reach a real person.
 do $$
 declare
   pw text := extensions.crypt('SplitIt@2026', extensions.gen_salt('bf'));
+  priya uuid := 'd0000000-0000-4000-8000-000000000001';
+  ravi uuid := 'd0000000-0000-4000-8000-000000000002';
+  ananya uuid := 'd0000000-0000-4000-8000-000000000003';
+  arjun uuid := 'd0000000-0000-4000-8000-000000000004';
+  meera uuid := 'd0000000-0000-4000-8000-000000000005';
+  goa uuid; flat uuid; s uuid;
   u record;
+  procedure_as text;
 begin
+  if exists (select 1 from auth.users where id = priya) then
+    raise notice 'Demo data already present'; return;
+  end if;
   for u in select * from (values
-    ('11111111-1111-4111-8111-111111111111'::uuid, 'Priya Sharma', '919886054321', 'priya@example.com'),
-    ('22222222-2222-4222-8222-222222222222'::uuid, 'Ravi Kumar',   '919845012345', 'ravi@example.com'),
-    ('33333333-3333-4333-8333-333333333333'::uuid, 'Ananya Iyer',  '919900011223', 'ananya@example.com'),
-    ('44444444-4444-4444-8444-444444444444'::uuid, 'Arjun Mehta',  '919900045678', 'arjun@example.com'),
-    ('55555555-5555-4555-8555-555555555555'::uuid, 'Meera Nair',   '919811122334', 'meera@example.com')
-  ) as t(id, name, phone, email)
-  loop
+    (priya, 'Priya Sharma', '919000000001', 'priya.demo@example.com', 'priya.demo@example'),
+    (ravi, 'Ravi Kumar', '919000000002', 'ravi.demo@example.com', 'ravi.demo@example'),
+    (ananya, 'Ananya Iyer', '919000000003', 'ananya.demo@example.com', 'ananya.demo@example'),
+    (arjun, 'Arjun Mehta', '919000000004', 'arjun.demo@example.com', null),
+    (meera, 'Meera Nair', '919000000005', 'meera.demo@example.com', 'meera.demo@example')
+  ) as t(id, name, phone, email, upi) loop
     insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, phone, phone_confirmed_at,
-      raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
-      confirmation_token, recovery_token, email_change_token_new, email_change, phone_change, phone_change_token, email_change_token_current, reauthentication_token)
+      raw_app_meta_data, raw_user_meta_data, created_at, updated_at, confirmation_token, recovery_token, email_change_token_new,
+      email_change, phone_change, phone_change_token, email_change_token_current, reauthentication_token)
     values ('00000000-0000-0000-0000-000000000000', u.id, 'authenticated', 'authenticated', u.email, pw, now(), u.phone, now(),
-      '{"provider":"email","providers":["email","phone"]}', jsonb_build_object('full_name', u.name), now() - interval '20 days', now(),
-      '', '', '', '', '', '', '', '')
-    on conflict (id) do nothing;
+      '{"provider":"email","providers":["email"]}', jsonb_build_object('full_name', u.name, 'phone', u.phone), now() - interval '20 days', now(),
+      '', '', '', '', '', '', '', '');
     insert into auth.identities (id, user_id, provider_id, provider, identity_data, last_sign_in_at, created_at, updated_at)
-    values (gen_random_uuid(), u.id, u.id::text, 'email', jsonb_build_object('sub', u.id::text, 'email', u.email, 'email_verified', true), now(), now(), now()),
-           (gen_random_uuid(), u.id, u.phone, 'phone', jsonb_build_object('sub', u.id::text, 'phone', u.phone, 'phone_verified', true), now(), now(), now())
-    on conflict do nothing;
+    values (gen_random_uuid(), u.id, u.id::text, 'email', jsonb_build_object('sub', u.id::text, 'email', u.email, 'email_verified', true), now(), now(), now());
+    update public.profiles set upi_id = u.upi where id = u.id;
   end loop;
-  update public.profiles set upi_id = case id
-    when '11111111-1111-4111-8111-111111111111' then 'priya.demo@example'
-    when '22222222-2222-4222-8222-222222222222' then 'ravi.demo@example'
-    when '33333333-3333-4333-8333-333333333333' then 'ananya.demo@example'
-    when '44444444-4444-4444-8444-444444444444' then 'arjun.demo@example'
-    when '55555555-5555-4555-8555-555555555555' then 'meera.demo@example' end
-  where upi_id is null and id in ('11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222',
-    '33333333-3333-4333-8333-333333333333', '44444444-4444-4444-8444-444444444444', '55555555-5555-4555-8555-555555555555');
-end $$;
 
-create or replace function pg_temp.as_user(u uuid) returns void language sql as $$
-  select set_config('request.jwt.claims', json_build_object('sub', u, 'role', 'authenticated')::text, true);
-$$;
+  -- Act as Priya / Ravi so every write goes through the same checked functions the app uses.
+  perform set_config('request.jwt.claims', json_build_object('sub', priya, 'role', 'authenticated')::text, true);
+  goa := public.create_group('Goa Trip', 'trip');
+  perform public.add_member(goa, '9000000002'); perform public.add_member(goa, '9000000003');
+  perform public.add_member(goa, '9000000004'); perform public.add_member(goa, '9000000005');
+  perform set_config('request.jwt.claims', json_build_object('sub', ravi, 'role', 'authenticated')::text, true);
+  flat := public.create_group('Flat 402', 'flat');
+  perform public.add_member(flat, '9000000001'); perform public.add_member(flat, '9000000004');
 
-create or replace function pg_temp.exp(g uuid, payer uuid, total bigint, descr text, cat text, days_ago int, st text, inputs jsonb)
-returns void language sql as $$
-  select pg_temp.as_user(payer);
-  select public.save_expense(jsonb_build_object('group_id', g, 'paid_by', payer, 'total_amount', total, 'description', descr,
-    'category', cat, 'expense_date', current_date - days_ago, 'split_type', st, 'inputs', inputs));
-$$;
+  perform set_config('request.jwt.claims', json_build_object('sub', priya, 'role', 'authenticated')::text, true);
+  perform public.save_expense(gen_random_uuid(), goa, priya, 800000, 'Villa booking, 2 nights', 'stay', current_date - 12, 'equal', array[priya, ravi, ananya, arjun, meera], '{}');
+  perform public.save_expense(gen_random_uuid(), goa, ravi, 240000, 'Scooter rentals', 'travel', current_date - 11, 'exact', array[priya, ravi, ananya, arjun, meera],
+    jsonb_build_object(priya, 60000, ravi, 60000, ananya, 40000, arjun, 40000, meera, 40000));
+  perform public.save_expense(gen_random_uuid(), goa, ananya, 356000, 'Seafood dinner at Britto''s', 'food', current_date - 11, 'percentage', array[priya, ravi, ananya, arjun, meera],
+    jsonb_build_object(priya, 2000, ravi, 2500, ananya, 2000, arjun, 2000, meera, 1500));
+  perform public.save_expense(gen_random_uuid(), goa, meera, 150000, 'Dudhsagar trip tickets', 'fun', current_date - 10, 'shares', array[priya, ravi, ananya, arjun, meera],
+    jsonb_build_object(priya, 1, ravi, 1, ananya, 1, arjun, 2, meera, 1));
+  perform public.save_expense(gen_random_uuid(), goa, arjun, 45000, 'Petrol', 'travel', current_date - 10, 'equal', array[priya, ravi, ananya, arjun, meera], '{}');
+  perform public.save_expense(gen_random_uuid(), goa, priya, 15000, 'Chai and vada pav', 'food', current_date - 9, 'equal', array[priya, ananya, meera], '{}');
+  perform public.save_expense(gen_random_uuid(), goa, ravi, 189000, 'Beach shack drinks', 'food', current_date - 9, 'equal', array[priya, ravi, ananya, arjun, meera], '{}');
+  perform set_config('request.jwt.claims', json_build_object('sub', ravi, 'role', 'authenticated')::text, true);
+  perform public.save_expense(gen_random_uuid(), flat, ravi, 450000, 'November electricity + internet', 'rent', current_date - 8, 'equal', array[priya, ravi, arjun], '{}');
+  perform public.save_expense(gen_random_uuid(), flat, priya, 263500, 'Monthly groceries (BigBasket)', 'groceries', current_date - 7, 'shares', array[priya, ravi, arjun],
+    jsonb_build_object(priya, 2, ravi, 1, arjun, 1));
+  perform public.save_expense(gen_random_uuid(), flat, arjun, 60000, 'Cooking gas cylinder', 'rent', current_date - 6, 'equal', array[priya, ravi, arjun], '{}');
+  perform public.save_expense(gen_random_uuid(), flat, ravi, 32000, 'Cleaning supplies', 'groceries', current_date - 5, 'exact', array[priya, ravi, arjun],
+    jsonb_build_object(priya, 12000, ravi, 10000, arjun, 10000));
+  perform public.save_expense(gen_random_uuid(), flat, priya, 120000, 'Pizza night', 'food', current_date - 2, 'percentage', array[priya, ravi, arjun],
+    jsonb_build_object(priya, 4000, ravi, 3000, arjun, 3000));
 
-do $$
-declare
-  p uuid := '11111111-1111-4111-8111-111111111111';
-  r uuid := '22222222-2222-4222-8222-222222222222';
-  a uuid := '33333333-3333-4333-8333-333333333333';
-  j uuid := '44444444-4444-4444-8444-444444444444';
-  m uuid := '55555555-5555-4555-8555-555555555555';
-  goa uuid; flat uuid; sid uuid;
-  five jsonb;
-begin
-  if exists (select 1 from public.groups where name = 'Goa Trip') then return; end if;
+  -- Payments: Meera paid Priya (confirmed); Arjun says he paid Ravi (waiting); Ananya started paying Priya (pending).
+  perform set_config('request.jwt.claims', json_build_object('sub', meera, 'role', 'authenticated')::text, true);
+  s := public.start_settlement(goa, priya, 100000, 'upi');
+  perform public.mark_settlement_paid(s, '431298765432');
+  perform set_config('request.jwt.claims', json_build_object('sub', priya, 'role', 'authenticated')::text, true);
+  perform public.respond_settlement(s, true);
+  perform set_config('request.jwt.claims', json_build_object('sub', arjun, 'role', 'authenticated')::text, true);
+  s := public.start_settlement(flat, ravi, 50000, 'cash');
+  perform public.mark_settlement_paid(s, null);
+  perform set_config('request.jwt.claims', json_build_object('sub', ananya, 'role', 'authenticated')::text, true);
+  perform public.start_settlement(goa, priya, 80000, 'upi');
+  perform set_config('request.jwt.claims', '', true);
 
-  perform pg_temp.as_user(p);
-  goa := (public.create_group('Goa Trip', 'trip', array['+919845012345', 'ananya@example.com', '9900045678', 'meera@example.com']) ->> 'group_id')::uuid;
-  perform pg_temp.as_user(r);
-  flat := (public.create_group('Flat 402', 'flat', array['priya@example.com', '+91 99000 45678']) ->> 'group_id')::uuid;
-
-  five := jsonb_build_array(jsonb_build_object('user_id', p), jsonb_build_object('user_id', r), jsonb_build_object('user_id', a),
-                            jsonb_build_object('user_id', j), jsonb_build_object('user_id', m));
-
-  -- Goa Trip: 8 expenses
-  perform pg_temp.exp(goa, p, 800000, 'Villa booking, 3 nights', 'stay', 9, 'equal', five);
-  perform pg_temp.exp(goa, r, 200000, 'Scooter rental', 'travel', 8, 'equal', five);
-  perform pg_temp.exp(goa, j, 600000, 'Parasailing at Calangute', 'entertainment', 7, 'exact', jsonb_build_array(
-    jsonb_build_object('user_id', p, 'value', 150000), jsonb_build_object('user_id', r, 'value', 150000),
-    jsonb_build_object('user_id', a, 'value', 100000), jsonb_build_object('user_id', j, 'value', 100000),
-    jsonb_build_object('user_id', m, 'value', 100000)));
-  perform pg_temp.exp(goa, r, 425000, 'Dinner at Fisherman''s Wharf', 'food', 7, 'shares', jsonb_build_array(
-    jsonb_build_object('user_id', p, 'value', 1), jsonb_build_object('user_id', r, 'value', 2),
-    jsonb_build_object('user_id', a, 'value', 1), jsonb_build_object('user_id', j, 'value', 1)));
-  perform pg_temp.exp(goa, m, 115000, 'Groceries for the villa', 'groceries', 8, 'percentage', jsonb_build_array(
-    jsonb_build_object('user_id', p, 'value', 4000), jsonb_build_object('user_id', a, 'value', 3000),
-    jsonb_build_object('user_id', m, 'value', 3000)));
-  perform pg_temp.exp(goa, a, 180000, 'Cab to Dabolim airport', 'travel', 6, 'equal', five);
-  perform pg_temp.exp(goa, p, 234000, 'Beach shack lunch', 'food', 6, 'percentage', jsonb_build_array(
-    jsonb_build_object('user_id', p, 'value', 2000), jsonb_build_object('user_id', r, 'value', 2000),
-    jsonb_build_object('user_id', a, 'value', 2000), jsonb_build_object('user_id', j, 'value', 2000),
-    jsonb_build_object('user_id', m, 'value', 2000)));
-  perform pg_temp.exp(goa, j, 375000, 'Water sports tickets', 'entertainment', 6, 'shares', jsonb_build_array(
-    jsonb_build_object('user_id', p, 'value', 1), jsonb_build_object('user_id', r, 'value', 1),
-    jsonb_build_object('user_id', a, 'value', 1), jsonb_build_object('user_id', j, 'value', 1),
-    jsonb_build_object('user_id', m, 'value', 1)));
-
-  -- Flat 402: 4 expenses
-  perform pg_temp.exp(flat, r, 246000, 'Electricity bill, October', 'utilities', 12, 'equal',
-    jsonb_build_array(jsonb_build_object('user_id', p), jsonb_build_object('user_id', r), jsonb_build_object('user_id', j)));
-  perform pg_temp.exp(flat, p, 117900, 'Wi-Fi recharge', 'utilities', 10, 'equal',
-    jsonb_build_array(jsonb_build_object('user_id', p), jsonb_build_object('user_id', r), jsonb_build_object('user_id', j)));
-  perform pg_temp.exp(flat, j, 321550, 'Groceries from DMart', 'groceries', 5, 'exact', jsonb_build_array(
-    jsonb_build_object('user_id', p, 'value', 100000), jsonb_build_object('user_id', r, 'value', 121550),
-    jsonb_build_object('user_id', j, 'value', 100000)));
-  perform pg_temp.exp(flat, p, 15000, 'Milk and bread', 'groceries', 4, 'equal',
-    jsonb_build_array(jsonb_build_object('user_id', p), jsonb_build_object('user_id', r), jsonb_build_object('user_id', j)));
-
-  -- Settlements: one completed (cash, Flat 402), one marked paid (UPI, Goa), one pending (UPI, Goa).
-  perform pg_temp.as_user(p);
-  sid := (public.start_settlement(flat, j, 50000, 'cash') ->> 'id')::uuid;
-  perform public.mark_settlement_paid(sid, null);
-  perform pg_temp.as_user(j);
-  perform public.respond_settlement(sid, true);
-
-  perform pg_temp.as_user(m);
-  sid := (public.start_settlement(goa, p, 140000, 'upi') ->> 'id')::uuid;
-  perform public.mark_settlement_paid(sid, '431209876543');
-
-  perform pg_temp.as_user(a);
-  perform public.start_settlement(goa, j, 150000, 'upi');
-
-  -- Seeded debts are old enough for the 3-day reminder rule.
-  update public.debt_since set since = now() - interval '6 days';
-  update public.settlements set marked_paid_at = now() - interval '4 days' where status = 'marked_paid';
+  -- Make the history look real: expenses were added on their dates, the waiting claim is 4 days old.
+  update public.expenses set created_at = expense_date + time '20:00' - interval '5 hours 30 minutes', updated_at = expense_date + time '20:00' - interval '5 hours 30 minutes'
+  where group_id in (goa, flat);
+  update public.settlements set marked_paid_at = now() - interval '4 days', created_at = now() - interval '4 days' where group_id = flat and status = 'marked_paid';
 end $$;

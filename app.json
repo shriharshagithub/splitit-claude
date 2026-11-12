@@ -8,8 +8,8 @@
     "scheme": "splitit",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon",
-      "bundleIdentifier": "ai.neocrew.splitit",
+      "icon": "./assets/images/icon.png",
+      "bundleIdentifier": "in.splitit.app",
       "infoPlist": {
         "LSApplicationQueriesSchemes": [
           "upi"
@@ -18,12 +18,13 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#2b2f8f",
+        "backgroundColor": "#0F766E",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "package": "ai.neocrew.splitit",
+      "predictiveBackGestureEnabled": false,
+      "package": "in.splitit.app",
       "permissions": [
         "android.permission.CAMERA"
       ]
@@ -33,16 +34,20 @@
       "favicon": "./assets/images/favicon.png",
       "name": "SplitIt",
       "shortName": "SplitIt",
-      "themeColor": "#2b2f8f",
-      "backgroundColor": "#f5f5fb"
+      "themeColor": "#0F766E",
+      "backgroundColor": "#F4F7F6"
     },
     "plugins": [
-      "expo-router",
-      "@sentry/react-native",
+      [
+        "expo-router",
+        {
+          "asyncRoutes": false
+        }
+      ],
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#2b2f8f",
+          "backgroundColor": "#F4F7F6",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
@@ -51,11 +56,11 @@
         "expo-image-picker",
         {
           "cameraPermission": "SplitIt uses the camera to scan restaurant bills.",
-          "photosPermission": "SplitIt reads photos of bills you choose to scan."
+          "photosPermission": "SplitIt reads photos of bills and your profile photo."
         }
       ],
-      "./plugins/withUpiQueries.js",
-      "@react-native-community/datetimepicker"
+      "@sentry/react-native",
+      "./plugins/withUpiQueries.js"
     ],
     "experiments": {
       "typedRoutes": false,

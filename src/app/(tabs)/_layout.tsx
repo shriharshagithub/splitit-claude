@@ -1,30 +1,24 @@
-import { Activity, User, Users } from 'lucide-react-native';
-import { Tabs } from 'expo-router/js-tabs';
-import { useUnreadCount } from '@/lib/hooks';
-import { font, useColors } from '@/theme';
+import { Tabs } from 'expo-router';
+import { Text } from 'react-native';
+import { useNotifications } from '@/lib/api';
+import { useColors } from '@/lib/theme';
 
 export default function TabsLayout() {
   const c = useColors();
-  const unread = useUnreadCount();
+  const unread = (useNotifications().data ?? []).filter((n) => !n.read_at).length;
+  const icon = (glyph: string) => ({ color }: { color: any }) => <Text style={{ color, fontSize: 20 }}>{glyph}</Text>;
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: c.brand,
-        tabBarInactiveTintColor: c.muted,
-        tabBarStyle: { backgroundColor: c.surface, borderTopColor: c.line, minHeight: 64 },
-        tabBarItemStyle: { paddingVertical: 4 },
-        tabBarLabelStyle: { fontFamily: font.bodyMedium, fontSize: 13, lineHeight: 18 },
-        sceneStyle: { backgroundColor: c.ground },
-      }}>
-      <Tabs.Screen name="index" options={{ title: 'Groups', tabBarIcon: ({ color }) => <Users color={color} size={24} strokeWidth={1.75} /> }} />
-      <Tabs.Screen name="activity" options={{
-        title: 'Activity',
-        tabBarBadge: unread > 0 ? unread : undefined,
-        tabBarBadgeStyle: { backgroundColor: c.accent, color: c.onAccent },
-        tabBarIcon: ({ color }) => <Activity color={color} size={24} strokeWidth={1.75} />,
-      }} />
-      <Tabs.Screen name="profile" options={{ title: 'Profile', tabBarIcon: ({ color }) => <User color={color} size={24} strokeWidth={1.75} /> }} />
+    <Tabs screenOptions={{
+      headerShown: false,
+      tabBarActiveTintColor: c.primary, tabBarInactiveTintColor: c.muted,
+      tabBarStyle: { backgroundColor: c.surface, borderTopColor: c.border, minHeight: 64 },
+      tabBarItemStyle: { minHeight: 56, paddingVertical: 4 },
+      tabBarLabelStyle: { fontSize: 13, fontWeight: '600', lineHeight: 18 },
+      sceneStyle: { backgroundColor: c.bg },
+    }}>
+      <Tabs.Screen name="index" options={{ title: 'Groups', tabBarIcon: icon('👥'), tabBarAccessibilityLabel: 'Groups' }} />
+      <Tabs.Screen name="activity" options={{ title: 'Activity', tabBarIcon: icon('🔔'), tabBarBadge: unread ? unread : undefined, tabBarAccessibilityLabel: `Activity${unread ? `, ${unread} unread` : ''}` }} />
+      <Tabs.Screen name="profile" options={{ title: 'Profile', tabBarIcon: icon('🙂'), tabBarAccessibilityLabel: 'Profile' }} />
     </Tabs>
   );
 }

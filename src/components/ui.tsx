@@ -1,296 +1,230 @@
+import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { ChevronLeft, Eye, EyeOff, X } from 'lucide-react-native';
 import { useState, type ReactNode } from 'react';
 import {
-  ActivityIndicator, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput,
-  View, type StyleProp, type TextInputProps, type TextProps, type TextStyle, type ViewStyle,
+  ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
+  type StyleProp, type TextInputProps, type TextStyle, type ViewStyle,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { formatINR } from '@/core';
-import { dismissNotice, useSync } from '@/lib/offline';
-import { radius, space, type, useColors, type Colors } from '@/theme';
+import { describeNet, formatINR } from '@/core';
+import { MIN_TOUCH, radius, space, useColors } from '@/lib/theme';
 
-type Variant = keyof typeof type;
+export const MAX_W = 480;
 
-export function T({ v = 'body', color, style, children, lines, center, selectable, ...rest }: {
-  v?: Variant; color?: keyof Colors; style?: StyleProp<TextStyle>; children: ReactNode; lines?: number; center?: boolean; selectable?: boolean;
-} & Pick<TextProps, 'accessibilityRole' | 'accessibilityLiveRegion' | 'testID'>) {
+export function T({ children, style, v = 'body', color, numberOfLines, selectable }: {
+  children: ReactNode; style?: StyleProp<TextStyle>; v?: 'title' | 'h2' | 'body' | 'small' | 'label' | 'money' | 'big';
+  color?: string; numberOfLines?: number; selectable?: boolean;
+}) {
   const c = useColors();
+  const base = ({
+    title: { fontSize: 26, fontWeight: '800', letterSpacing: -0.3 },
+    h2: { fontSize: 18, fontWeight: '700' },
+    body: { fontSize: 16, lineHeight: 22 },
+    small: { fontSize: 14, lineHeight: 19 },
+    label: { fontSize: 14, fontWeight: '600' },
+    money: { fontSize: 16, fontWeight: '700', fontVariant: ['tabular-nums'] },
+    big: { fontSize: 34, fontWeight: '800', fontVariant: ['tabular-nums'], letterSpacing: -0.5 },
+  } as Record<string, TextStyle>)[v];
   return (
-    <Text numberOfLines={lines} selectable={selectable} {...rest}
-      style={[type[v], { color: c[color ?? 'ink'] }, center && { textAlign: 'center' }, v === 'overline' && { textTransform: 'uppercase' }, style]}>
+    <Text selectable={selectable} numberOfLines={numberOfLines} style={[{ color: color ?? (v === 'small' || v === 'label' ? c.muted : c.text) }, base, style]}>
       {children}
     </Text>
   );
 }
 
-/** Money never wraps or truncates. */
-export function Money({ paise, v = 'amount', color, style, abs }: { paise: number; v?: Variant; color?: keyof Colors; style?: StyleProp<TextStyle>; abs?: boolean }) {
-  return (
-    <T v={v} color={color} style={[{ flexShrink: 0, fontVariant: ['tabular-nums'] }, style]} lines={1}>
-      {formatINR(abs ? Math.abs(paise) : paise)}
-    </T>
-  );
-}
-
-export function Screen({ title, subtitle, back, right, children, footer, scroll = true, padded = true }: {
-  title?: string; subtitle?: string; back?: boolean | 'close'; right?: ReactNode; children: ReactNode; footer?: ReactNode; scroll?: boolean; padded?: boolean;
+export function Screen({ children, title, back = true, right, scroll = true, footer }: {
+  children: ReactNode; title?: string; back?: boolean; right?: ReactNode; scroll?: boolean; footer?: ReactNode;
 }) {
   const c = useColors();
-  const Body = scroll ? ScrollView : View;
+  const body = (
+    <View style={{ width: '100%', maxWidth: MAX_W, alignSelf: 'center', padding: space(4), gap: space(3), flexGrow: 1 }}>{children}</View>
+  );
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: c.ground }} edges={['top', 'left', 'right']}>
-      {(title || back) && (
-        <View style={s.header}>
-          {back ? (
-            <IconButton label={back === 'close' ? 'Close' : 'Back'} onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}>
-              {back === 'close' ? <X color={c.ink} size={24} strokeWidth={1.75} /> : <ChevronLeft color={c.ink} size={24} strokeWidth={1.75} />}
-            </IconButton>
-          ) : <View style={{ width: space[2] }} />}
-          <View style={{ flex: 1, minWidth: 0 }}>
-            {title ? <T v="title" lines={1}>{title}</T> : null}
-            {subtitle ? <T v="caption" color="muted" lines={1}>{subtitle}</T> : null}
-          </View>
-          {right}
-        </View>
-      )}
-      <OfflineBanner />
+    <SafeAreaView edges={['top', 'left', 'right']} style={{ flex: 1, backgroundColor: c.bg }}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <Body style={{ flex: 1 }} contentContainerStyle={scroll ? [padded && s.content] : undefined} keyboardShouldPersistTaps="handled">
-          {scroll ? children : <View style={[{ flex: 1 }, padded && s.content]}>{children}</View>}
-        </Body>
-        {footer ? <SafeAreaView edges={['bottom']} style={[s.footer, { borderTopColor: c.line, backgroundColor: c.ground }]}>{footer}</SafeAreaView> : null}
+        {title !== undefined && (
+          <View style={{ width: '100%', maxWidth: MAX_W, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', paddingHorizontal: space(2), minHeight: 56, gap: space(1) }}>
+            {back ? (
+              <Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
+                style={{ width: MIN_TOUCH, height: MIN_TOUCH, alignItems: 'center', justifyContent: 'center' }}>
+                <T v="h2" color={c.primary}>‹</T>
+              </Pressable>
+            ) : <View style={{ width: space(2) }} />}
+            <T v="h2" style={{ flex: 1 }} numberOfLines={1}>{title}</T>
+            {right}
+          </View>
+        )}
+        <OfflineBanner />
+        {scroll ? <ScrollView contentContainerStyle={{ flexGrow: 1, paddingBottom: space(8) }} keyboardShouldPersistTaps="handled">{body}</ScrollView> : body}
+        {footer && <View style={{ width: '100%', maxWidth: MAX_W, alignSelf: 'center', padding: space(4), paddingTop: space(2), borderTopWidth: 1, borderColor: c.border, backgroundColor: c.bg }}>{footer}</View>}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
-export function IconButton({ label, onPress, children }: { label: string; onPress: () => void; children: ReactNode }) {
+export function Card({ children, style, onPress, label }: { children: ReactNode; style?: StyleProp<ViewStyle>; onPress?: () => void; label?: string }) {
+  const c = useColors();
+  const st = [{ backgroundColor: c.surface, borderRadius: radius.m, borderWidth: 1, borderColor: c.border, padding: space(4), gap: space(2) }, style];
+  if (!onPress) return <View style={st}>{children}</View>;
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} hitSlop={4}
-      style={({ pressed }) => [s.iconBtn, pressed && { opacity: 0.6 }]}>
+    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={({ pressed }) => [st, pressed && { opacity: 0.85 }]}>
       {children}
     </Pressable>
   );
 }
 
-export function Button({ label, onPress, variant = 'primary', disabled, loading, small, icon, style }: {
-  label: string; onPress?: () => void; variant?: 'primary' | 'upi' | 'secondary' | 'quiet' | 'danger';
-  disabled?: boolean; loading?: boolean; small?: boolean; icon?: ReactNode; style?: StyleProp<ViewStyle>;
+export function Button({ title, onPress, variant = 'primary', loading, disabled, style, small, label }: {
+  title: string; onPress?: () => void; variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'teal'; loading?: boolean; disabled?: boolean;
+  style?: StyleProp<ViewStyle>; small?: boolean; label?: string;
 }) {
   const c = useColors();
-  const palette = {
-    primary: { bg: c.brand, fg: c.onBrand, border: c.brand },
-    upi: { bg: c.accent, fg: c.onAccent, border: c.accent },
-    secondary: { bg: c.surface, fg: c.brand, border: c.lineStrong },
-    quiet: { bg: 'transparent', fg: c.brand, border: 'transparent' },
-    danger: { bg: c.surface, fg: c.danger, border: c.danger },
-  }[variant];
+  const bg = { primary: c.accent, teal: c.primary, secondary: 'transparent', ghost: 'transparent', danger: c.dangerBg }[variant];
+  const fg = { primary: c.onAccent, teal: c.onPrimary, secondary: c.primary, ghost: c.primary, danger: c.danger }[variant];
   const off = disabled || loading;
   return (
-    <Pressable accessibilityRole="button" accessibilityState={{ disabled: !!off, busy: !!loading }} disabled={off} onPress={onPress}
-      style={({ pressed }) => [
-        s.btn, small && s.btnSmall,
-        { backgroundColor: disabled ? c.sunken : palette.bg, borderColor: disabled ? 'transparent' : palette.border },
-        pressed && { opacity: 0.85 }, style,
-      ]}>
-      {loading ? <ActivityIndicator color={palette.fg} /> : icon}
-      <T v={small ? 'label' : 'bodyStrong'} color={undefined} style={{ color: disabled ? c.muted : palette.fg }} lines={1}>{label}</T>
+    <Pressable accessibilityRole="button" accessibilityLabel={label ?? title} accessibilityState={{ disabled: !!off, busy: !!loading }} disabled={off} onPress={onPress}
+      style={({ pressed }) => [{
+        minHeight: MIN_TOUCH, minWidth: MIN_TOUCH, borderRadius: radius.s, paddingHorizontal: small ? space(3) : space(5), alignItems: 'center', justifyContent: 'center',
+        backgroundColor: bg, borderWidth: variant === 'secondary' ? 1.5 : 0, borderColor: c.primary, opacity: off ? 0.5 : pressed ? 0.8 : 1, flexDirection: 'row', gap: space(2),
+      }, style]}>
+      {loading && <ActivityIndicator color={fg} />}
+      <Text style={{ color: fg, fontSize: small ? 15 : 16, fontWeight: '700' }}>{title}</Text>
     </Pressable>
   );
 }
 
-export function Field({ label, error, help, amount, style, secureTextEntry, ...props }: TextInputProps & { label: string; error?: string | null; help?: string; amount?: boolean }) {
-  const c = useColors();
-  const [reveal, setReveal] = useState(false);
-  return (
-    <View style={{ gap: space[1] }}>
-      <T v="label">{label}</T>
-      <View style={{ justifyContent: 'center' }}>
-        <TextInput
-          accessibilityLabel={label}
-          placeholderTextColor={c.muted}
-          secureTextEntry={secureTextEntry && !reveal}
-          autoCapitalize={secureTextEntry ? 'none' : props.autoCapitalize}
-          autoCorrect={secureTextEntry ? false : props.autoCorrect}
-          style={[
-            amount ? type.amountLg : type.body,
-            s.input, { color: c.ink, backgroundColor: c.surface, borderColor: error ? c.danger : c.lineStrong },
-            secureTextEntry ? { paddingRight: 52 } : null,
-            style,
-          ]}
-          {...props}
-        />
-        {secureTextEntry ? (
-          <Pressable accessibilityRole="button" accessibilityLabel={reveal ? 'Hide password' : 'Show password'} onPress={() => setReveal(!reveal)}
-            style={{ position: 'absolute', right: 0, width: 48, height: 48, alignItems: 'center', justifyContent: 'center' }}>
-            {reveal ? <EyeOff size={20} color={c.muted} /> : <Eye size={20} color={c.muted} />}
-          </Pressable>
-        ) : null}
-      </View>
-      {error ? <T v="caption" color="danger">{error}</T> : help ? <T v="caption" color="muted">{help}</T> : null}
-    </View>
-  );
-}
-
-export function Segmented<V extends string>({ label, options, value, onChange }: {
-  label?: string; options: { value: V; label: string }[]; value: V; onChange: (v: V) => void;
-}) {
+export function Field({ label, error, hint, right, style, hideLabel, ...p }: TextInputProps & { label: string; error?: string | null; hint?: string; right?: ReactNode; style?: StyleProp<ViewStyle>; hideLabel?: boolean }) {
   const c = useColors();
   return (
-    <View style={{ gap: space[1] }}>
-      {label ? <T v="label">{label}</T> : null}
-      <View accessibilityRole="radiogroup" accessibilityLabel={label} style={[s.seg, { backgroundColor: c.sunken }]}>
-        {options.map((o) => {
-          const on = o.value === value;
-          return (
-            <Pressable key={o.value} accessibilityRole="radio" accessibilityState={{ selected: on }} onPress={() => onChange(o.value)}
-              style={[s.segItem, on && { backgroundColor: c.surface, borderColor: c.line, borderWidth: 1 }]}>
-              <T v="label" color={on ? 'ink' : 'muted'} lines={1}>{o.label}</T>
-            </Pressable>
-          );
-        })}
-      </View>
-    </View>
-  );
-}
-
-export type Tone = 'owed' | 'owe' | 'pending' | 'done' | 'declined' | 'settled' | 'brand';
-export function Pill({ tone, children }: { tone: Tone; children: ReactNode }) {
-  const c = useColors();
-  const m = {
-    owed: [c.positiveSoft, c.positive], owe: [c.negativeSoft, c.negative], pending: [c.accentSoft, c.pending],
-    done: [c.positiveSoft, c.positive], declined: [c.sunken, c.danger], settled: [c.sunken, c.muted], brand: [c.brandSoft, c.brand],
-  }[tone];
-  return (
-    <View style={[s.pill, { backgroundColor: m[0] }]}>
-      <Text style={[type.label, { color: m[1] }]} numberOfLines={1}>{children}</Text>
-    </View>
-  );
-}
-
-export function Avatar({ name, uri, size = 40 }: { name: string; uri?: string | null; size?: number }) {
-  const c = useColors();
-  const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('') || '?';
-  if (uri) return <Image source={{ uri }} style={{ width: size, height: size, borderRadius: size / 2 }} accessibilityIgnoresInvertColors />;
-  return (
-    <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: c.brandSoft, alignItems: 'center', justifyContent: 'center' }}>
-      <Text style={[type.label, { color: c.brand, fontSize: size * 0.36 }]}>{initials}</Text>
-    </View>
-  );
-}
-
-export function SplitDisc({ size = 40 }: { size?: number }) {
-  const c = useColors();
-  const half = { width: (size - 4) / 2, height: size };
-  return (
-    <View style={{ flexDirection: 'row', gap: 4 }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-      <View style={[half, { backgroundColor: c.brand, borderTopLeftRadius: size / 2, borderBottomLeftRadius: size / 2 }]} />
-      <View style={[half, { backgroundColor: c.accent, borderTopRightRadius: size / 2, borderBottomRightRadius: size / 2 }]} />
-    </View>
-  );
-}
-
-export function Card({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
-  const c = useColors();
-  return <View style={[s.card, { backgroundColor: c.surface, borderColor: c.line }, style]}>{children}</View>;
-}
-
-export function Row({ children, onPress, first, label }: { children: ReactNode; onPress?: () => void; first?: boolean; label?: string }) {
-  const c = useColors();
-  const style = [s.row, !first && { borderTopWidth: 1, borderTopColor: c.line }];
-  if (!onPress) return <View style={style}>{children}</View>;
-  return (
-    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={({ pressed }) => [style, pressed && { backgroundColor: c.sunken }]}>
-      {children}
-    </Pressable>
-  );
-}
-
-export function Section({ title, children, right }: { title: string; children: ReactNode; right?: ReactNode }) {
-  return (
-    <View style={{ gap: space[2] }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <T v="overline" color="muted">{title}</T>
+    <View style={[{ gap: space(1) }, style]}>
+      {!hideLabel && <T v="label">{label}</T>}
+      <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: c.surface, borderRadius: radius.s, borderWidth: 1.5, borderColor: error ? c.danger : c.border }}>
+        <TextInput accessibilityLabel={label} placeholderTextColor={c.muted}
+          style={{ flex: 1, minHeight: MIN_TOUCH, paddingHorizontal: space(3), fontSize: 16, color: c.text, ...(Platform.OS === 'web' ? { outlineStyle: 'none' as any } : null) }} {...p} />
         {right}
       </View>
-      {children}
+      {error ? <T v="small" color={c.danger}>{error}</T> : hint ? <T v="small">{hint}</T> : null}
     </View>
   );
 }
 
-export function OfflineBanner() {
+export function PasswordField(p: TextInputProps & { label: string; error?: string | null; hint?: string }) {
+  const [show, setShow] = useState(false);
   const c = useColors();
-  const { online, outbox, syncing, notices } = useSync();
   return (
-    <>
-      {(!online || syncing || outbox.length > 0) && (
-        <View accessibilityRole="alert" style={[s.banner, { backgroundColor: c.sunken }]}>
-          <View style={[s.dot, { backgroundColor: online ? c.accent : c.muted }]} />
-          <T v="label" style={{ flex: 1 }}>{!online ? 'You are offline' : syncing ? 'Back online. Syncing…' : 'Waiting to sync'}</T>
-          {outbox.length > 0 && <T v="amountSm">{outbox.length} waiting to sync</T>}
-        </View>
-      )}
-      {notices.map((n) => (
-        <View key={n.key} accessibilityRole="alert" style={[s.banner, { backgroundColor: c.accentSoft, alignItems: 'flex-start' }]}>
-          <T v="label" color="pending" style={{ flex: 1 }}>{n.text}</T>
-          <IconButton label="Dismiss" onPress={() => void dismissNotice(n.key)}><X color={c.pending} size={18} /></IconButton>
-        </View>
-      ))}
-    </>
+    <Field {...p} secureTextEntry={!show} autoCapitalize="none" autoCorrect={false}
+      right={<Pressable accessibilityRole="button" accessibilityLabel={show ? 'Hide password' : 'Show password'} onPress={() => setShow(!show)}
+        style={{ minHeight: MIN_TOUCH, paddingHorizontal: space(3), justifyContent: 'center' }}><T v="label" color={c.primary}>{show ? 'Hide' : 'Show'}</T></Pressable>} />
   );
 }
 
-export function ErrorView({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
-  const msg = error instanceof Error ? error.message : 'Something went wrong.';
+export function Segmented<K extends string>({ options, value, onChange, label }: { options: { key: K; label: string }[]; value: K; onChange: (k: K) => void; label?: string }) {
+  const c = useColors();
   return (
-    <Card style={{ gap: space[3], padding: space[4] }}>
-      <T color="danger">{msg}</T>
-      {onRetry ? <Button label="Try again" variant="secondary" small onPress={onRetry} /> : null}
-    </Card>
+    <View accessibilityRole="tablist" accessibilityLabel={label} style={{ flexDirection: 'row', backgroundColor: c.surface2, borderRadius: radius.s, padding: 3, gap: 3 }}>
+      {options.map((o) => {
+        const on = o.key === value;
+        return (
+          <Pressable key={o.key} accessibilityRole="tab" accessibilityState={{ selected: on }} onPress={() => onChange(o.key)}
+            style={{ flex: 1, minHeight: 44, borderRadius: radius.s - 2, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? c.surface : 'transparent', borderWidth: on ? 1 : 0, borderColor: c.border }}>
+            <Text style={{ color: on ? c.text : c.muted, fontWeight: on ? '700' : '500', fontSize: 15 }} numberOfLines={1}>{o.label}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+export function Chip({ label, selected, onPress }: { label: string; selected?: boolean; onPress?: () => void }) {
+  const c = useColors();
+  return (
+    <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: !!selected }} accessibilityLabel={label} onPress={onPress}
+      style={{ minHeight: MIN_TOUCH, paddingHorizontal: space(4), borderRadius: 999, justifyContent: 'center', borderWidth: 1.5, borderColor: selected ? c.primary : c.border, backgroundColor: selected ? c.owedBg : c.surface }}>
+      <Text style={{ color: selected ? c.primary : c.text, fontWeight: selected ? '700' : '500', fontSize: 15 }}>{selected ? '✓ ' : ''}{label}</Text>
+    </Pressable>
+  );
+}
+
+/** Money direction in words, with colour and an arrow only as extra signals. */
+export function NetText({ net, style, big, who }: { net: number; style?: StyleProp<TextStyle>; big?: boolean; who?: string }) {
+  const c = useColors();
+  const d = describeNet(net);
+  const color = d.direction === 'owe' ? c.owe : d.direction === 'owed' ? c.owed : c.muted;
+  const arrow = d.direction === 'owe' ? '↑ ' : d.direction === 'owed' ? '↓ ' : '✓ ';
+  const words = who ? d.words.replace(/^you are/, `${who} is`).replace(/^you owe/, `${who} owes`).replace(/^you are settled/, `${who} is settled`) : d.words;
+  return <T v={big ? 'h2' : 'money'} color={color} style={style}>{arrow}{words}</T>;
+}
+
+export function Money({ p, style, color }: { p: number; style?: StyleProp<TextStyle>; color?: string }) {
+  return <T v="money" style={style} color={color}>{formatINR(p)}</T>;
+}
+
+export function Avatar({ name, url, size = 40 }: { name?: string | null; url?: string | null; size?: number }) {
+  const c = useColors();
+  const initials = (name ?? '?').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join('') || '?';
+  if (url) return <Image source={{ uri: url }} style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: c.surface2 }} accessibilityLabel={name ?? 'photo'} />;
+  return (
+    <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: c.owedBg, alignItems: 'center', justifyContent: 'center' }}>
+      <Text style={{ color: c.primary, fontWeight: '800', fontSize: size * 0.38 }}>{initials}</Text>
+    </View>
+  );
+}
+
+export function ErrorBox({ message, onRetry }: { message?: string | null; onRetry?: () => void }) {
+  const c = useColors();
+  if (!message) return null;
+  return (
+    <View accessibilityRole="alert" style={{ backgroundColor: c.dangerBg, borderRadius: radius.s, padding: space(3), gap: space(2) }}>
+      <T color={c.danger}>{message}</T>
+      {onRetry && <Button title="Try again" variant="ghost" small onPress={onRetry} style={{ alignSelf: 'flex-start' }} />}
+    </View>
+  );
+}
+
+export function InfoBox({ children, tone = 'info' }: { children: ReactNode; tone?: 'info' | 'warn' | 'ok' }) {
+  const c = useColors();
+  const bg = tone === 'warn' ? c.oweBg : tone === 'ok' ? c.owedBg : c.surface2;
+  return <View style={{ backgroundColor: bg, borderRadius: radius.s, padding: space(3), gap: space(2) }}>{children}</View>;
+}
+
+export function Empty({ title, text, action }: { title: string; text?: string; action?: ReactNode }) {
+  return (
+    <View style={{ alignItems: 'center', padding: space(8), gap: space(3) }}>
+      <T v="h2" style={{ textAlign: 'center' }}>{title}</T>
+      {text && <T style={{ textAlign: 'center' }} color={undefined}>{text}</T>}
+      {action}
+    </View>
   );
 }
 
 export function Loading() {
   const c = useColors();
-  return (
-    <View style={{ gap: space[3] }} accessibilityLabel="Loading">
-      {[0, 1, 2].map((i) => <View key={i} style={{ height: 64, borderRadius: radius.md, backgroundColor: c.sunken }} />)}
-    </View>
-  );
+  return <View style={{ padding: space(8), alignItems: 'center' }}><ActivityIndicator color={c.primary} size="large" accessibilityLabel="Loading" /></View>;
 }
 
 export function Sheet({ visible, onClose, title, children }: { visible: boolean; onClose: () => void; title: string; children: ReactNode }) {
   const c = useColors();
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={{ flex: 1, backgroundColor: c.scrim }} onPress={onClose} accessibilityLabel="Close" />
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <SafeAreaView edges={['bottom']} style={[s.sheet, { backgroundColor: c.surface }]}>
-          <View style={[s.grabber, { backgroundColor: c.line }]} />
-          <T v="title">{title}</T>
-          {children}
-        </SafeAreaView>
-      </KeyboardAvoidingView>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable accessibilityLabel="Close" onPress={onClose} style={{ flex: 1, backgroundColor: c.overlay, justifyContent: 'flex-end', alignItems: 'center' }}>
+        <Pressable onPress={() => {}} style={{ width: '100%', maxWidth: MAX_W, backgroundColor: c.bg, borderTopLeftRadius: radius.l, borderTopRightRadius: radius.l, padding: space(4), gap: space(3), maxHeight: '90%' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <T v="h2" style={{ flex: 1 }}>{title}</T>
+            <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={onClose} style={{ width: MIN_TOUCH, height: MIN_TOUCH, alignItems: 'center', justifyContent: 'center' }}>
+              <T v="h2" color={c.muted}>✕</T>
+            </Pressable>
+          </View>
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: space(3), paddingBottom: space(4) }}>{children}</ScrollView>
+        </Pressable>
+      </Pressable>
     </Modal>
   );
 }
 
-const s = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', gap: space[1], paddingHorizontal: space[2], paddingTop: space[2], paddingBottom: space[2] },
-  content: { padding: space[4], gap: space[6], paddingBottom: space[12] },
-  footer: { paddingHorizontal: space[4], paddingTop: space[3], paddingBottom: space[3], borderTopWidth: 1, gap: space[2] },
-  iconBtn: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
-  btn: { minHeight: 48, borderRadius: radius.md, borderWidth: 1, paddingHorizontal: space[6], flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space[2] },
-  btnSmall: { minHeight: 36, paddingHorizontal: space[3] },
-  input: { minHeight: 48, borderWidth: 1, borderRadius: radius.sm, paddingHorizontal: space[3], paddingVertical: space[2] },
-  seg: { flexDirection: 'row', padding: 4, borderRadius: radius.md, gap: 4 },
-  segItem: { flex: 1, minHeight: 40, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
-  pill: { borderRadius: radius.full, paddingHorizontal: space[3], paddingVertical: space[1], alignSelf: 'flex-start' },
-  card: { borderWidth: 1, borderRadius: radius.md, overflow: 'hidden' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: space[3], paddingHorizontal: space[4], paddingVertical: space[3], minHeight: 48 },
-  banner: { flexDirection: 'row', alignItems: 'center', gap: space[2], marginHorizontal: space[4], marginBottom: space[2], borderRadius: radius.md, paddingHorizontal: space[4], paddingVertical: space[2] },
-  dot: { width: 8, height: 8, borderRadius: 4 },
-  sheet: { borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, padding: space[4], gap: space[4] },
-  grabber: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2 },
-});
+export function Divider() {
+  const c = useColors();
+  return <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: c.border }} />;
+}
+
+// Imported lazily to avoid a cycle with lib modules that import ui.
+import { OfflineBanner } from './OfflineBanner';

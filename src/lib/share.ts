@@ -1,42 +1,37 @@
 import * as Clipboard from 'expo-clipboard';
-import * as Linking from 'expo-linking';
-import { Platform, Share } from 'react-native';
+import { Linking, Platform, Share } from 'react-native';
+import { WEB_URL } from './config';
 
-/** Opens the share sheet (WhatsApp, SMS…). Falls back to copying on browsers without one. Returns what happened. */
-export async function shareText(message: string): Promise<'shared' | 'copied'> {
+export const joinUrl = (code: string) => `${WEB_URL}/join/${code}`;
+
+export function inviteMessage(groupName: string, code: string) {
+  return `Hi! I've added you to "${groupName}" on SplitIt so we can split our expenses. Sign up with this number and you'll be in the group: ${joinUrl(code)}`;
+}
+
+/** wa.me link with the message filled in, addressed to the invited number (91XXXXXXXXXX). */
+export function whatsAppUrl(phone: string, text: string) {
+  return `https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(text)}`;
+}
+
+export async function openUrl(url: string) {
+  if (Platform.OS === 'web') window.open(url, '_blank', 'noopener');
+  else await Linking.openURL(url);
+}
+
+export async function copy(text: string) {
+  await Clipboard.setStringAsync(text);
+}
+
+/** System share sheet where available, otherwise copy. Returns 'copied' when it fell back to copying. */
+export async function shareText(text: string): Promise<'shared' | 'copied'> {
   if (Platform.OS === 'web') {
-    const nav = globalThis.navigator as Navigator & { share?: (d: { text: string }) => Promise<void> };
+    const nav: any = typeof navigator !== 'undefined' ? navigator : null;
     if (nav?.share) {
-      try {
-        await nav.share({ text: message });
-        return 'shared';
-      } catch {
-        /* fall through to copy */
-      }
+      try { await nav.share({ text }); return 'shared'; } catch { /* cancelled */ }
     }
-    await Clipboard.setStringAsync(message);
+    await copy(text);
     return 'copied';
   }
-  await Share.share({ message });
+  await Share.share({ message: text });
   return 'shared';
-}
-
-/** wa.me link that opens a chat with this Indian number, message filled in. Works in the app and in browsers (WhatsApp Web on computers). */
-export function whatsappLink(phone: string, message: string): string {
-  const digits = phone.replace(/\D/g, '').replace(/^0+/, '');
-  const number = digits.length === 10 ? `91${digits}` : digits;
-  return `https://wa.me/${number}?text=${encodeURIComponent(message)}`;
-}
-
-export async function openWhatsApp(phone: string, message: string): Promise<void> {
-  const url = whatsappLink(phone, message);
-  if (Platform.OS === 'web') {
-    // A pop-up blocker can stop a new tab opened after a network call; then go there directly.
-    // ('noopener' is not passed because it makes open() return null even when the tab opened.)
-    const tab = globalThis.open?.(url, '_blank');
-    if (tab) tab.opener = null;
-    else globalThis.location.href = url;
-    return;
-  }
-  await Linking.openURL(url);
 }

@@ -1,198 +1,190 @@
-import { useMutation } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Camera, Clock, Plus, Settings, UserPlus } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, RefreshControl, ScrollView, View } from 'react-native';
-import { Avatar, Button, Card, ErrorView, IconButton, Loading, Money, Pill, Row, Screen, Segmented, T } from '@/components/ui';
-import { formatINR } from '@/core';
-import { getGroupInviteLink, requestPayment } from '@/lib/api';
-import { useAuth, useMe } from '@/lib/auth';
-import { inviteLink } from '@/lib/links';
-import { shareText } from '@/lib/share';
-import { errText } from '@/lib/errors';
-import { useExpenseFeed, useGroup, useOpenSettlements, useTransfers } from '@/lib/hooks';
-import { useSync } from '@/lib/offline';
-import { invalidateMoney } from '@/lib/query';
-import type { ExpenseRow } from '@/lib/types';
-import { space, useColors } from '@/theme';
-
-const MONTH = new Intl.DateTimeFormat('en-IN', { month: 'long', year: 'numeric' });
-const DAY = new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short' });
-const asDate = (d: string) => new Date(`${d}T00:00:00`);
+import { FlatList, Pressable, View } from 'react-native';
+import { formatDate, formatINR, simplifyDebts } from '@/core';
+import { Avatar, Button, Card, Empty, ErrorBox, InfoBox, Loading, NetText, Screen, Segmented, T } from '@/components/ui';
+import { keys, useExpenses, useGroupInfo, useNets, usePendingExpenses, useRpc, useSettlements } from '@/lib/api';
+import { useUserId } from '@/lib/auth';
+import { friendlyError } from '@/lib/errors';
+import { useLiveGroups } from '@/lib/realtime';
+import { MIN_TOUCH, space, useColors } from '@/lib/theme';
+import { categoryOf, type Expense, type Member } from '@/lib/types';
 
 export default function GroupDetail() {
-  const { id, tab: initialTab } = useLocalSearchParams<{ id: string; tab?: 'expenses' | 'balances' }>();
+  const { id, tab: initialTab } = useLocalSearchParams<{ id: string; tab?: string }>();
   const c = useColors();
-  const me = useMe();
-  const { profile } = useAuth();
-  const [tab, setTab] = useState<'expenses' | 'balances'>(initialTab ?? 'expenses');
-  const group = useGroup(id);
-  const { transfers, nets, error: netsErr, refetch: refetchNets } = useTransfers(id);
-  const feed = useExpenseFeed(id, me);
-  const settlements = useOpenSettlements(id);
-  const { online, outbox } = useSync();
-  const [msg, setMsg] = useState<string | null>(null);
+  const me = useUserId();
+  const [tab, setTab] = useState<'expenses' | 'balances'>(initialTab === 'balances' ? 'balances' : 'expenses');
+  const info = useGroupInfo(id);
+  const nets = useNets(id);
+  useLiveGroups([id]);
+  const names = useMemo(() => Object.fromEntries((info.data?.members ?? []).map((m) => [m.user_id, m.profile.full_name])), [info.data]);
+  const name = (uid: string) => (uid === me ? 'You' : names[uid] ?? 'Former member');
 
-  const names = useMemo(() => Object.fromEntries((group.data?.members ?? []).map((m) => [m.user_id, m.profile.full_name])), [group.data]);
-  const first = (uid: string) => (uid === me ? 'You' : (names[uid] ?? 'Someone').split(' ')[0]);
-  const isAdmin = group.data?.members.some((m) => m.user_id === me && m.role === 'admin');
-  const myNet = nets?.[me] ?? 0;
-
-  const request = useMutation({
-    mutationFn: (t: { from: string; amount: number }) => requestPayment(id, t.from, t.amount),
-    onSuccess: (_, t) => { setMsg(`Asked ${first(t.from)} for ${formatINR(t.amount)}. They get an email and a notification.`); invalidateMoney(id); },
-    onError: (e) => setMsg(errText(e)),
-  });
-
-  const invite = useMutation({
-    mutationFn: async () => {
-      const token = await getGroupInviteLink(id);
-      const g = group.data!;
-      return shareText(`${profile?.full_name?.split(' ')[0] ?? 'A friend'} invited you to "${g.name}" on SplitIt, to split expenses and settle up over UPI. Join here: ${inviteLink(token)}`);
-    },
-    onSuccess: (r) => setMsg(r === 'copied' ? 'Invite link copied. Paste it into WhatsApp or SMS.' : 'Invite link shared.'),
-    onError: (e) => setMsg(errText(e)),
-  });
-
-  if (group.isLoading) return <Screen back title=" "><Loading /></Screen>;
-  if (group.error && !group.data) return <Screen back title="Group"><ErrorView error={group.error} onRetry={() => void group.refetch()} /></Screen>;
-  const g = group.data!;
-
-  const header = (
-    <View style={{ gap: space[3], paddingBottom: space[3] }}>
-      <View style={{ gap: 2 }}>
-        <T v="display" lines={2}>{g.name}</T>
-        <T v="caption" color="muted">
-          {g.members.length} members{nets ? ' · ' : ''}
-          {nets ? (myNet === 0 ? 'you are settled up' : myNet > 0 ? 'you are owed ' : 'you owe ') : ''}
-          {nets && myNet !== 0 ? <T v="amountSm" color={myNet > 0 ? 'positive' : 'negative'}>{formatINR(Math.abs(myNet))}</T> : null}
-        </T>
-      </View>
-      <Segmented value={tab} onChange={setTab} options={[{ value: 'expenses', label: 'Expenses' }, { value: 'balances', label: 'Balances' }]} />
-      {msg ? <T v="label" color="muted" accessibilityLiveRegion="polite">{msg}</T> : null}
-    </View>
-  );
-
-  const renderExpense = ({ item, index }: { item: ExpenseRow; index: number }) => {
-    const prev = feed.rows[index - 1];
-    const month = MONTH.format(asDate(item.expense_date));
-    const showMonth = !prev || MONTH.format(asDate(prev.expense_date)) !== month;
-    const paidByMe = item.paid_by === me;
-    const lent = paidByMe ? item.total_amount - item.my_owed : 0;
-    return (
-      <View>
-        {showMonth && <T v="overline" color="muted" style={{ paddingTop: space[4], paddingBottom: space[2] }}>{month}</T>}
-        <Card style={{ borderRadius: 0, borderTopWidth: showMonth ? 1 : 0 }}>
-          <Row first onPress={() => router.push(`/group/${id}/expense?expenseId=${item.id}`)} label={`${item.description}, ${formatINR(item.total_amount)}`}>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <T v="heading" lines={1}>{item.description}</T>
-              {item.pending ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Clock size={14} color={c.pending} />
-                  <T v="caption" color="pending">{first(item.paid_by)} paid · waiting to sync</T>
-                </View>
-              ) : <T v="caption" color="muted">{first(item.paid_by)} paid · {DAY.format(asDate(item.expense_date))}</T>}
-            </View>
-            <View style={{ alignItems: 'flex-end' }}>
-              <Money paise={item.total_amount} />
-              {item.pending ? <T v="caption" color="muted">share after sync</T>
-                : paidByMe && lent > 0 ? <T v="caption" color="positive">you lent <T v="amountSm" color="positive">{formatINR(lent)}</T></T>
-                : !paidByMe && item.my_owed > 0 ? <T v="caption" color="negative">you borrowed <T v="amountSm" color="negative">{formatINR(item.my_owed)}</T></T>
-                : <T v="caption" color="muted">not involved</T>}
-            </View>
-          </Row>
-        </Card>
-      </View>
-    );
-  };
-
-  const open = settlements.data ?? [];
-  const balances = (
-    <View style={{ gap: space[4] }}>
-      {outbox.some((o) => o.groupId === id) && <T v="caption" color="muted">Balances update once your offline changes sync.</T>}
-      {netsErr && !nets ? <ErrorView error={netsErr} onRetry={refetchNets} /> : !transfers ? <Loading /> : transfers.length === 0 ? (
-        <Card style={{ padding: space[4] }}><T>Everyone is settled up in this group.</T></Card>
-      ) : (
-        <>
-          <T v="caption" color="muted">{transfers.length === 1 ? '1 payment clears' : `${transfers.length} payments clear`} every debt in this group.</T>
-          {transfers.some((t) => t.to === me) && profile && !profile.upi_id ? (
-            <Card style={{ padding: space[3], gap: space[2], backgroundColor: c.accentSoft, borderColor: c.accentSoft }}>
-              <T v="label" color="pending">Add your UPI ID so people who owe you can pay by UPI. Until then they can only settle in cash.</T>
-              <Button small label="Add UPI ID" onPress={() => router.push('/profile')} style={{ alignSelf: 'flex-start' }} />
-            </Card>
-          ) : null}
-          <Card>
-            {transfers.map((t, i) => {
-              const claim = open.find((s) => s.from_user === t.from && s.to_user === t.to && s.status === 'marked_paid');
-              const started = open.find((s) => s.from_user === t.from && s.to_user === t.to && s.status === 'pending');
-              const declined = open.find((s) => s.from_user === t.from && s.to_user === t.to && s.status === 'declined');
-              const mine = t.from === me || t.to === me;
-              return (
-                <Row key={`${t.from}-${t.to}`} first={i === 0}>
-                  <Avatar name={names[t.from] ?? '?'} />
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <T lines={2}><T v="bodyStrong">{first(t.from)}</T> {t.from === me ? 'owe' : 'owes'} <T v="bodyStrong">{t.to === me ? 'you' : first(t.to)}</T></T>
-                    <Money paise={t.amount} color={!mine ? 'ink' : t.to === me ? 'positive' : 'negative'} />
-                    {declined && t.from === me && !claim ? <T v="caption" color="danger">{first(t.to)} did not receive your last payment.</T> : null}
-                  </View>
-                  {claim ? (
-                    t.to === me ? <Button small variant="secondary" label="Confirm" onPress={() => router.push('/activity')} />
-                      : <Pill tone="pending">{t.from === me ? `Waiting for ${first(t.to)}` : 'Awaiting confirmation'}</Pill>
-                  ) : t.from === me ? (
-                    <Button small variant="secondary" label={started ? 'Finish paying' : 'Settle up'} onPress={() => router.push(`/group/${id}/settle/${t.to}`)} />
-                  ) : t.to === me ? (
-                    <Button small variant="secondary" label="Request" disabled={!online || request.isPending}
-                      onPress={() => request.mutate({ from: t.from, amount: t.amount })} />
-                  ) : null}
-                </Row>
-              );
-            })}
-          </Card>
-        </>
-      )}
-      <T v="caption" color="muted">Debts older than 3 days get an automatic reminder. A debt clears only when the person who is owed confirms the payment.</T>
-    </View>
-  );
-
+  if (!info.data) {
+    return <Screen title="Group">{info.error ? <ErrorBox message={friendlyError(info.error)} onRetry={() => info.refetch()} /> : <Loading />}</Screen>;
+  }
+  const myNet = nets.data?.[me] ?? 0;
   return (
-    <Screen back scroll={false} padded={false}
-      right={
-        <View style={{ flexDirection: 'row' }}>
-          <IconButton label="Invite people with a link" onPress={() => { if (online) invite.mutate(); else setMsg('Sharing an invite needs a connection.'); }}>
-            <UserPlus color={c.ink} size={24} strokeWidth={1.75} />
-          </IconButton>
-          {isAdmin ? <IconButton label="Group settings" onPress={() => router.push(`/group/${id}/edit`)}><Settings color={c.ink} size={24} strokeWidth={1.75} /></IconButton> : null}
-        </View>
-      }
+    <Screen scroll={false} title={info.data.name}
+      right={<Pressable accessibilityRole="button" accessibilityLabel="Group settings and members" onPress={() => router.push(`/group/${id}/edit`)}
+        style={{ minWidth: MIN_TOUCH, height: MIN_TOUCH, alignItems: 'center', justifyContent: 'center' }}><T v="h2">⚙︎</T></Pressable>}
       footer={
-        <View style={{ flexDirection: 'row', gap: space[3] }}>
-          <Button style={{ flex: 1 }} variant="secondary" label="Scan bill" icon={<Camera size={20} color={c.brand} />} onPress={() => router.push(`/group/${id}/scan`)} />
-          <Button style={{ flex: 1 }} label="Add expense" icon={<Plus size={20} color={c.onBrand} />} onPress={() => router.push(`/group/${id}/expense`)} />
+        <View style={{ flexDirection: 'row', gap: space(2) }}>
+          <Button title="+ Add expense" style={{ flex: 1 }} onPress={() => router.push(`/group/${id}/expense`)} />
+          <Button title="Scan bill" variant="secondary" onPress={() => router.push(`/group/${id}/scan`)} />
         </View>
       }>
-      {tab === 'expenses' ? (
-        <FlatList
-          data={feed.rows}
-          keyExtractor={(r) => r.id}
-          renderItem={renderExpense}
-          ListHeaderComponent={header}
-          contentContainerStyle={{ padding: space[4], paddingBottom: space[12] }}
-          onEndReached={() => { if (feed.hasNextPage && !feed.isFetchingNextPage) void feed.fetchNextPage(); }}
-          onEndReachedThreshold={0.5}
-          initialNumToRender={15}
-          windowSize={7}
-          refreshControl={<RefreshControl refreshing={feed.isRefetching} onRefresh={() => { void feed.refetch(); refetchNets(); void settlements.refetch(); }} />}
-          ListEmptyComponent={feed.isLoading ? <Loading /> : feed.error ? <ErrorView error={feed.error} onRetry={() => void feed.refetch()} /> : (
-            <Card style={{ padding: space[4], gap: space[2] }}><T v="heading">No expenses yet</T><T color="muted">Add the first one, or scan a bill.</T></Card>
-          )}
-          ListFooterComponent={feed.isFetchingNextPage ? <ActivityIndicator style={{ margin: space[4] }} /> : undefined}
-        />
-      ) : (
-        <ScrollView contentContainerStyle={{ padding: space[4], paddingBottom: space[12] }}
-          refreshControl={<RefreshControl refreshing={false} onRefresh={() => { refetchNets(); void settlements.refetch(); }} />}>
-          {header}{balances}
-        </ScrollView>
-      )}
+      <Card style={{ backgroundColor: c.surface2, paddingVertical: space(3) }}>
+        <T v="small">{info.data.members.length} members</T>
+        <NetText net={myNet} big />
+      </Card>
+      <Segmented label="Expenses or balances" value={tab} onChange={setTab} options={[{ key: 'expenses', label: 'Expenses' }, { key: 'balances', label: 'Balances' }]} />
+      {tab === 'expenses' ? <ExpenseList id={id} me={me} name={name} /> : <Balances id={id} me={me} name={name} members={info.data.members} groupName={info.data.name} />}
     </Screen>
+  );
+}
+
+function ExpenseList({ id, me, name }: { id: string; me: string; name: (u: string) => string }) {
+  const c = useColors();
+  const q = useExpenses(id);
+  const { saves, deletes } = usePendingExpenses(id);
+  const rows = useMemo(() => {
+    const server = (q.data?.pages.flat() ?? []).filter((e) => !deletes.has(e.id));
+    const pendingIds = new Set(saves.map((s) => s.id));
+    const all = [...saves, ...server.filter((e) => !pendingIds.has(e.id))];
+    return all.sort((a, b) => (a.expense_date === b.expense_date ? b.created_at.localeCompare(a.created_at) : b.expense_date.localeCompare(a.expense_date)));
+  }, [q.data, saves, deletes]);
+
+  if (q.isLoading && saves.length === 0) return <Loading />;
+  if (q.error && !q.data) return <ErrorBox message={friendlyError(q.error)} onRetry={() => q.refetch()} />;
+  return (
+    <FlatList
+      style={{ flex: 1 }}
+      data={rows}
+      keyExtractor={(e) => e.id}
+      contentContainerStyle={{ gap: space(2), paddingBottom: space(4) }}
+      onEndReached={() => q.hasNextPage && !q.isFetchingNextPage && q.fetchNextPage()}
+      onEndReachedThreshold={0.5}
+      initialNumToRender={15}
+      windowSize={7}
+      ListEmptyComponent={<Empty title="No expenses yet" text="Add the first one, or scan a bill." />}
+      ListFooterComponent={q.isFetchingNextPage ? <Loading /> : undefined}
+      renderItem={({ item: e }) => <ExpenseRow e={e} me={me} name={name} onPress={() => router.push(`/group/${id}/expense?eid=${e.id}`)} />}
+    />
+  );
+}
+
+function ExpenseRow({ e, me, name, onPress }: { e: Expense; me: string; name: (u: string) => string; onPress: () => void }) {
+  const c = useColors();
+  const mine = Number(e.expense_splits.find((s) => s.user_id === me)?.amount_owed ?? 0);
+  const paidByMe = e.paid_by === me;
+  const lent = paidByMe ? Number(e.total_amount) - mine : 0;
+  const cat = categoryOf(e.category);
+  let share: { text: string; color: string };
+  if (paidByMe && lent > 0) share = { text: `you lent ${formatINR(lent)}`, color: c.owed };
+  else if (!paidByMe && mine > 0) share = { text: `your share ${formatINR(mine)}`, color: c.owe };
+  else share = { text: 'not involved', color: c.muted };
+  return (
+    <Card onPress={onPress} label={`${e.description}, ${formatINR(Number(e.total_amount))}`} style={{ paddingVertical: space(3), flexDirection: 'row', alignItems: 'center', gap: space(3) }}>
+      <View style={{ width: 44, alignItems: 'center' }}>
+        <T v="small">{formatDate(e.expense_date).split(' ').slice(0, 2).join(' ')}</T>
+        <T v="h2">{cat.emoji}</T>
+      </View>
+      <View style={{ flex: 1, gap: 2 }}>
+        <T numberOfLines={1} style={{ fontWeight: '600' }}>{e.description}</T>
+        <T v="small" numberOfLines={1}>{name(e.paid_by)} paid {formatINR(Number(e.total_amount))}</T>
+        {e.pending && <T v="small" color={c.owe}>⏳ Waiting to sync</T>}
+      </View>
+      <T v="small" color={share.color} style={{ fontWeight: '700', textAlign: 'right', maxWidth: 130 }}>{share.text}</T>
+    </Card>
+  );
+}
+
+function Balances({ id, me, name, members, groupName }: { id: string; me: string; name: (u: string) => string; members: Member[]; groupName: string }) {
+  const c = useColors();
+  const nets = useNets(id);
+  const settlements = useSettlements(id);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const request = useRpc<{ p_group: string; p_from: string; p_amount: number }>('request_payment');
+  const respond = useRpc<{ p_id: string; p_confirm: boolean }>('respond_settlement', () => [[...keys.group(id)], [...keys.notifications], [...keys.myGroups]]);
+  const transfers = useMemo(() => {
+    if (!nets.data) return [];
+    try { return simplifyDebts(nets.data); } catch { return []; }
+  }, [nets.data]);
+  const open = (settlements.data ?? []).filter((s) => s.status === 'marked_paid');
+  const profile = (uid: string) => members.find((m) => m.user_id === uid)?.profile;
+
+  if (nets.isLoading) return <Loading />;
+  if (nets.error && !nets.data) return <ErrorBox message={friendlyError(nets.error)} onRetry={() => nets.refetch()} />;
+  return (
+    <FlatList
+      style={{ flex: 1 }}
+      data={[] as never[]}
+      renderItem={() => null}
+      ListHeaderComponent={
+        <View style={{ gap: space(3), paddingBottom: space(4) }}>
+          <ErrorBox message={error} />
+          {msg && <InfoBox tone="ok"><T>{msg}</T></InfoBox>}
+          {open.length > 0 && (
+            <>
+              <T v="h2">Waiting for confirmation</T>
+              {open.map((s) => (
+                <Card key={s.id}>
+                  <T>{name(s.from_user)} {s.from_user === me ? 'say' : 'says'} {s.from_user === me ? 'you' : 'they'} paid {name(s.to_user) === 'You' ? 'you' : name(s.to_user)} {formatINR(Number(s.amount))} {s.method === 'cash' ? 'in cash' : 'via UPI'}{s.upi_ref ? ` (ref ${s.upi_ref})` : ''}.</T>
+                  {s.to_user === me ? (
+                    <View style={{ flexDirection: 'row', gap: space(2) }}>
+                      <Button title="Confirm received" variant="teal" style={{ flex: 1 }} loading={respond.isPending && respond.variables?.p_id === s.id && respond.variables.p_confirm}
+                        onPress={() => respond.mutate({ p_id: s.id, p_confirm: true }, { onError: (e) => setError(friendlyError(e)), onSuccess: () => setMsg('Confirmed. The debt is cleared.') })} />
+                      <Button title="Not received" variant="secondary" style={{ flex: 1 }} loading={respond.isPending && respond.variables?.p_id === s.id && !respond.variables.p_confirm}
+                        onPress={() => respond.mutate({ p_id: s.id, p_confirm: false }, { onError: (e) => setError(friendlyError(e)), onSuccess: () => setMsg('Marked as not received. The debt stays open.') })} />
+                    </View>
+                  ) : <T v="small">Waiting for {name(s.to_user)} to confirm. The balance changes once they do.</T>}
+                </Card>
+              ))}
+            </>
+          )}
+          <T v="h2">Who pays whom</T>
+          {transfers.length === 0 && <InfoBox tone="ok"><T>Everyone is settled up. 🎉</T></InfoBox>}
+          {transfers.map((t) => (
+            <Card key={`${t.from}-${t.to}`}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: space(2) }}>
+                <Avatar name={name(t.from)} url={profile(t.from)?.avatar_url} size={32} />
+                <T style={{ flex: 1 }}>
+                  <T style={{ fontWeight: '700' }}>{name(t.from)}</T> {t.from === me ? 'pay' : 'pays'} <T style={{ fontWeight: '700' }}>{t.to === me ? 'you' : name(t.to)}</T>
+                </T>
+                <T v="money" color={t.from === me ? c.owe : t.to === me ? c.owed : c.text}>{formatINR(t.amount)}</T>
+              </View>
+              {t.from === me && (
+                <>
+                  {!profile(t.to)?.upi_id && <T v="small" color={c.owe}>{name(t.to)} hasn't added a UPI ID yet. You can still settle in cash.</T>}
+                  <Button title="Settle up" onPress={() => router.push(`/group/${id}/settle?to=${t.to}&amount=${t.amount}`)} />
+                </>
+              )}
+              {t.to === me && (
+                <Button title="Request payment" variant="secondary" loading={request.isPending && request.variables?.p_from === t.from}
+                  onPress={() => request.mutate({ p_group: id, p_from: t.from, p_amount: t.amount }, {
+                    onError: (e) => setError(friendlyError(e)),
+                    onSuccess: () => setMsg(`Asked ${name(t.from)} for ${formatINR(t.amount)}. They get a message in the app and by email.`),
+                  })} />
+              )}
+            </Card>
+          ))}
+          <T v="h2">Everyone's balance</T>
+          <Card>
+            {members.map((m) => (
+              <View key={m.user_id} style={{ flexDirection: 'row', alignItems: 'center', gap: space(3), minHeight: 44 }}>
+                <Avatar name={m.profile.full_name} url={m.profile.avatar_url} size={32} />
+                <View style={{ flex: 1 }}>
+                  <NetText net={nets.data?.[m.user_id] ?? 0} who={m.user_id === me ? undefined : m.profile.full_name.split(' ')[0]} />
+                </View>
+              </View>
+            ))}
+          </Card>
+          <T v="small">"Who pays whom" uses the fewest payments that clear every balance. Payments count only after the person receiving them confirms.</T>
+        </View>
+      }
+    />
   );
 }

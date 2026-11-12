@@ -1,10 +1,12 @@
-// Copies the pure core modules into the edge functions folder (Deno needs explicit .ts imports).
-// Run after changing src/core: node scripts/sync-shared.mjs  (CI fails if the copies drift).
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-const files = ['money', 'simplify', 'billText'];
-mkdirSync('supabase/functions/_shared/core', { recursive: true });
-for (const f of files) {
-  const src = readFileSync(`src/core/${f}.ts`, 'utf8').replace(/from '\.\/(\w+)'/g, "from './$1.ts'");
-  writeFileSync(`supabase/functions/_shared/core/${f}.ts`, `// GENERATED from src/core/${f}.ts by scripts/sync-shared.mjs. Do not edit.\n${src}`);
+// Copies the pure logic in src/core into supabase/functions/_shared/core so the edge functions
+// run exactly the same money, split and parsing code as the app. CI fails if the copy is stale.
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+const src = 'src/core';
+const dst = 'supabase/functions/_shared/core';
+mkdirSync(dst, { recursive: true });
+for (const f of readdirSync(src)) {
+  if (!f.endsWith('.ts')) continue;
+  // Deno needs explicit file extensions on relative imports.
+  const code = readFileSync(`${src}/${f}`, 'utf8').replace(/from '(\.\/[^']+)'/g, "from '$1.ts'");
+  writeFileSync(`${dst}/${f}`, `// GENERATED from ${src}/${f} by scripts/sync-shared.mjs. Do not edit.\n${code}`);
 }
-console.log('synced', files.join(', '));

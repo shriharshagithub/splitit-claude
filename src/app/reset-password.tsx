@@ -1,45 +1,58 @@
-import { router } from 'expo-router';
-import { useState } from 'react';
-import { Button, Field, Screen, T } from '@/components/ui';
-import { updatePassword } from '@/lib/api';
-import { useAuth } from '@/lib/auth';
-import { toAppError } from '@/lib/errors';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { Button, ErrorBox, InfoBox, Loading, PasswordField, Screen, T } from '@/components/ui';
+import { friendlyError } from '@/lib/errors';
+import { supabase } from '@/lib/supabase';
 
+/** Opened from the reset email. The single-use token is checked by Supabase, then a new password is set. */
 export default function ResetPassword() {
-  const { session, clearRecovery } = useAuth();
+  const { token_hash } = useLocalSearchParams<{ token_hash?: string }>();
+  const [state, setState] = useState<'checking' | 'ready' | 'bad' | 'done'>('checking');
   const [pw, setPw] = useState('');
   const [pw2, setPw2] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  if (!session) {
-    return (
-      <Screen title="Reset password">
-        <T>This reset link has expired or was already used. Ask for a new one from the log in screen.</T>
-        <Button label="Go to log in" onPress={() => router.replace('/login?mode=forgot')} />
-      </Screen>
-    );
-  }
-  const save = async () => {
+  useEffect(() => {
+    if (!token_hash) { setState('bad'); return; }
+    supabase.auth.verifyOtp({ token_hash, type: 'recovery' }).then(({ error: e }) => setState(e ? 'bad' : 'ready'));
+  }, [token_hash]);
+
+  async function save() {
     setError(null);
     if (pw.length < 8) return setError('Use at least 8 characters.');
-    if (pw !== pw2) return setError('The two passwords do not match.');
+    if (pw !== pw2) return setError('The two passwords are different.');
     setBusy(true);
-    try {
-      await updatePassword(pw);
-      clearRecovery();
-      router.replace('/');
-    } catch (e) {
-      setError(toAppError(e).message);
-    } finally {
-      setBusy(false);
-    }
-  };
+    const { error: e } = await supabase.auth.updateUser({ password: pw });
+    setBusy(false);
+    if (e) setError(friendlyError(e));
+    else setState('done');
+  }
+
   return (
-    <Screen title="Choose a new password">
-      <Field label="New password" value={pw} onChangeText={setPw} secureTextEntry autoComplete="new-password" />
-      <Field label="Type it again" value={pw2} onChangeText={setPw2} secureTextEntry autoComplete="new-password" error={error} />
-      <Button label="Save password" onPress={save} loading={busy} />
+    <Screen title="New password" back={false}>
+      {state === 'checking' && <Loading />}
+      {state === 'bad' && (
+        <>
+          <ErrorBox message="This reset link has already been used or has expired. Ask for a new one from the login screen." />
+          <Button title="Go to log in" onPress={() => router.replace('/login')} />
+        </>
+      )}
+      {state === 'ready' && (
+        <>
+          <T>Choose a new password for SplitIt.</T>
+          <PasswordField label="New password" value={pw} onChangeText={setPw} autoComplete="new-password" hint="At least 8 characters." />
+          <PasswordField label="Type it again" value={pw2} onChangeText={setPw2} autoComplete="new-password" onSubmitEditing={save} />
+          <ErrorBox message={error} />
+          <Button title="Save new password" onPress={save} loading={busy} />
+        </>
+      )}
+      {state === 'done' && (
+        <>
+          <InfoBox tone="ok"><T>Your password has been changed. You are logged in.</T></InfoBox>
+          <Button title="Open SplitIt" onPress={() => router.replace('/')} />
+        </>
+      )}
     </Screen>
   );
 }

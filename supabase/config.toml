@@ -1,17 +1,14 @@
-# Minimal Supabase CLI config used by the deploy workflow.
-project_id = "splitit"
+project_id = "ohawfftzgjuqwbilovmy"
 
 [functions.signup]
 verify_jwt = false
-
 [functions.login]
 verify_jwt = false
-
-[functions.notify-email]
+[functions.password-reset]
 verify_jwt = false
-
+[functions.send-email]
+verify_jwt = false
 [functions.reminders]
 verify_jwt = false
-
 [functions.scan-bill]
 verify_jwt = true
