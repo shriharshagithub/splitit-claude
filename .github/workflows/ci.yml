@@ -1,0 +1,21 @@
+# Checks on every push: types, unit tests (money, splits, fewest payments, UPI link, bill parsing, offline queue),
+# and that the server's copy of the shared logic matches the app's.
+name: Checks
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - name: Type-check
+        run: npx tsc --noEmit
+      - name: Unit tests
+        run: npx vitest run
+      - name: Server copy of shared logic is up to date
+        run: node scripts/sync-shared.mjs && git diff --exit-code supabase/functions/_shared/core

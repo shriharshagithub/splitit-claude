@@ -8,7 +8,7 @@
     "scheme": "splitit",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon",
+      "icon": "./assets/images/icon.png",
       "bundleIdentifier": "in.splitit.app",
       "infoPlist": {
         "LSApplicationQueriesSchemes": [
@@ -47,7 +47,7 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#0F766E",
+          "backgroundColor": "#F4F7F6",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }

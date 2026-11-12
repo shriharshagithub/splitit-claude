@@ -39,7 +39,7 @@ Deno.serve(async (req) => {
         const since = oldest[t.from] ? Date.parse(oldest[t.from]!) : now;
         if (!debtor || debtor.reminder_freq === 'off' || now - since < 3 * DAY) { skipped++; continue; }
         const gap = debtor.reminder_freq === 'weekly' ? 6.5 * DAY : 0.75 * DAY;
-        const { data: last } = await db.from('reminders').select('sent_at').eq('group_id', gid).eq('debtor_user_id', t.from)
+        const { data: last } = await db.from('reminders').select('sent_at').eq('group_id', gid).eq('debtor_user_id', t.from).eq('creditor_user_id', t.to)
           .eq('status', 'sent').order('sent_at', { ascending: false }).limit(1).maybeSingle();
         if (last?.sent_at && now - Date.parse(last.sent_at) < gap) { skipped++; continue; }
         const creditor = prof.get(t.to)?.full_name || 'Your friend';

@@ -1,0 +1,35 @@
+# Builds an installable Android APK on GitHub's machines (no paid build service) and attaches it to the run.
+# Download: Actions → "Android APK" → latest run → Artifacts → splitit-apk.
+name: Android APK
+on:
+  push:
+    paths-ignore: ['docs/**', '**.md', 'supabase/**', 'tests/**']
+  workflow_dispatch:
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      EXPO_PUBLIC_SENTRY_DSN: ${{ vars.SENTRY_DSN }}
+      SENTRY_DISABLE_AUTO_UPLOAD: 'true'
+      NODE_OPTIONS: --max-old-space-size=6144
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - uses: gradle/actions/setup-gradle@v4
+      - run: npm ci
+      - name: Generate the native Android project
+        run: npx expo prebuild --platform android --no-install
+      - name: Check the UPI app query is in the Android manifest
+        run: grep -q 'android:scheme="upi"' android/app/src/main/AndroidManifest.xml
+      - name: Build the APK (signed with the debug key, for installing directly)
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a,armeabi-v7a
+      - uses: actions/upload-artifact@v4
+        with:
+          name: splitit-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 30
