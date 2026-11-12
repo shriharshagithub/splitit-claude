@@ -93,11 +93,11 @@ export function Button({ title, onPress, variant = 'primary', loading, disabled,
   );
 }
 
-export function Field({ label, error, hint, right, style, ...p }: TextInputProps & { label: string; error?: string | null; hint?: string; right?: ReactNode; style?: StyleProp<ViewStyle> }) {
+export function Field({ label, error, hint, right, style, hideLabel, ...p }: TextInputProps & { label: string; error?: string | null; hint?: string; right?: ReactNode; style?: StyleProp<ViewStyle>; hideLabel?: boolean }) {
   const c = useColors();
   return (
     <View style={[{ gap: space(1) }, style]}>
-      <T v="label">{label}</T>
+      {!hideLabel && <T v="label">{label}</T>}
       <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: c.surface, borderRadius: radius.s, borderWidth: 1.5, borderColor: error ? c.danger : c.border }}>
         <TextInput accessibilityLabel={label} placeholderTextColor={c.muted}
           style={{ flex: 1, minHeight: MIN_TOUCH, paddingHorizontal: space(3), fontSize: 16, color: c.text, ...(Platform.OS === 'web' ? { outlineStyle: 'none' as any } : null) }} {...p} />

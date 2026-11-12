@@ -11,8 +11,9 @@ export default function TabsLayout() {
     <Tabs screenOptions={{
       headerShown: false,
       tabBarActiveTintColor: c.primary, tabBarInactiveTintColor: c.muted,
-      tabBarStyle: { backgroundColor: c.surface, borderTopColor: c.border, height: 64, paddingBottom: 8, paddingTop: 6 },
-      tabBarLabelStyle: { fontSize: 13, fontWeight: '600' },
+      tabBarStyle: { backgroundColor: c.surface, borderTopColor: c.border, minHeight: 64 },
+      tabBarItemStyle: { minHeight: 56, paddingVertical: 4 },
+      tabBarLabelStyle: { fontSize: 13, fontWeight: '600', lineHeight: 18 },
       sceneStyle: { backgroundColor: c.bg },
     }}>
       <Tabs.Screen name="index" options={{ title: 'Groups', tabBarIcon: icon('👥'), tabBarAccessibilityLabel: 'Groups' }} />

@@ -164,13 +164,13 @@ function ExpenseForm({ groupId }: { groupId: string }) {
               ) : (
                 <>
                   <Avatar name={m.profile.full_name} url={m.profile.avatar_url} size={32} />
-                  <T style={{ flex: 1 }} numberOfLines={1}>{name(m.user_id)}</T>
+                  <T style={{ flex: 1 }} numberOfLines={1}>{name(m.user_id).split(' ')[0]}</T>
                   <Field label={`${name(m.user_id)} ${type === 'exact' ? 'amount' : type === 'percentage' ? 'percent' : 'shares'}`} value={raw[m.user_id] ?? ''}
                     onChangeText={(v) => setRaw((r) => ({ ...r, [m.user_id]: v }))} keyboardType={type === 'shares' ? 'number-pad' : 'decimal-pad'}
-                    placeholder={type === 'exact' ? '₹0' : type === 'percentage' ? '0 %' : '0'} style={{ width: 96 }} editable={canEdit} />
+                    placeholder={type === 'exact' ? '₹0' : type === 'percentage' ? '0 %' : '0'} style={{ width: 84 }} editable={canEdit} hideLabel />
                 </>
               )}
-              <View style={{ flex: type === 'equal' ? 1 : undefined, alignItems: 'flex-end', minWidth: 96 }}>
+              <View style={{ flex: type === 'equal' ? 1 : undefined, alignItems: 'flex-end', minWidth: 88 }}>
                 <T v="money" color={share ? c.text : c.muted}>{share === null ? '–' : formatINR(share)}</T>
               </View>
             </View>
