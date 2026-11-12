@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Create group</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anek+Latin:wght@600;700&family=JetBrains+Mono:wght@500;600&family=Mukta:wght@400;500;600&display=swap">
+<style>
+body{margin:0}
+a{color:#2b2f8f}a:hover{color:#15163a}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #f5f5fb; color: #15163a; font-family: Mukta, 'Noto Sans', system-ui, sans-serif; display: flex; flex-direction: column; overflow: hidden">
+  <div style="display: flex; align-items: center; gap: 4px; padding: 16px 8px 8px">
+    <a href="Main.dc.html" aria-label="Back" style="width: 48px; height: 48px; display: flex; align-items: center; justify-content: center">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#15163a" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg>
+    </a>
+    <h1 style="margin: 0; font-family: 'Anek Latin', system-ui, sans-serif; font-size: 22px; line-height: 28px; font-weight: 600">New group</h1>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 24px; padding: 8px 16px 0">
+    <div style="display: flex; flex-direction: column; gap: 4px">
+      <label for="gname" style="font-size: 14px; line-height: 20px; font-weight: 500">Group name</label>
+      <input id="gname" value="Goa Trip" style="font-family: Mukta, sans-serif; font-size: 16px; line-height: 24px; color: #15163a; background: #ffffff; border: 1px solid #84869f; border-radius: 8px; min-height: 48px; padding: 0 12px; box-sizing: border-box">
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 4px">
+      <span id="gtype" style="font-size: 14px; line-height: 20px; font-weight: 500">Type</span>
+      <div role="group" aria-labelledby="gtype" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; background: #e9eaf4; padding: 4px; border-radius: 14px">
+        <button aria-pressed="true" style="min-height: 40px; border: 0; border-radius: 8px; background: #ffffff; color: #15163a; font-family: Mukta, sans-serif; font-size: 14px; line-height: 20px; font-weight: 500; box-shadow: 0 0 0 1px #d6d7e6">Trip</button>
+        <button aria-pressed="false" style="min-height: 40px; border: 0; border-radius: 8px; background: transparent; color: #54567a; font-family: Mukta, sans-serif; font-size: 14px; line-height: 20px; font-weight: 500">Flat</button>
+        <button aria-pressed="false" style="min-height: 40px; border: 0; border-radius: 8px; background: transparent; color: #54567a; font-family: Mukta, sans-serif; font-size: 14px; line-height: 20px; font-weight: 500">Other</button>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 4px">
+      <label for="addm" style="font-size: 14px; line-height: 20px; font-weight: 500">Add members</label>
+      <div style="display: flex; gap: 8px">
+        <input id="addm" placeholder="Phone number or email" value="meera.nair@gmail.com" style="flex: 1; min-width: 0; font-family: Mukta, sans-serif; font-size: 16px; line-height: 24px; color: #15163a; background: #ffffff; border: 1px solid #84869f; border-radius: 8px; min-height: 48px; padding: 0 12px; box-sizing: border-box">
+        <button style="min-height: 48px; padding: 0 16px; border-radius: 14px; background: #ffffff; color: #2b2f8f; border: 1px solid #84869f; font-family: Mukta, sans-serif; font-size: 16px; line-height: 24px; font-weight: 600">Add</button>
+      </div>
+      <span style="font-size: 13px; line-height: 18px; color: #54567a">They need a SplitIt account with this phone or email.</span>
+    </div>
+
+    <div style="background: #ffffff; border: 1px solid #d6d7e6; border-radius: 14px; overflow: hidden">
+      <div style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; min-height: 48px">
+        <span style="width: 40px; height: 40px; flex: none; border-radius: 999px; background: #e4e5f8; color: #2b2f8f; font-size: 14px; line-height: 40px; font-weight: 600; text-align: center">PS</span>
+        <span style="flex: 1; min-width: 0; display: flex; flex-direction: column"><span style="font-weight: 600">You</span><span style="font-size: 13px; line-height: 18px; color: #54567a">Priya Sharma</span></span>
+        <span style="background: #e4e5f8; color: #2b2f8f; border-radius: 999px; padding: 4px 12px; font-size: 14px; line-height: 20px; font-weight: 500">Admin</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; min-height: 48px; border-top: 1px solid #d6d7e6">
+        <span style="width: 40px; height: 40px; flex: none; border-radius: 999px; background: #e4e5f8; color: #2b2f8f; font-size: 14px; line-height: 40px; font-weight: 600; text-align: center">RK</span>
+        <span style="flex: 1; min-width: 0; display: flex; flex-direction: column"><span style="font-weight: 600">Ravi Kumar</span><span style="font-size: 13px; line-height: 18px; color: #54567a">+91 98450 12345</span></span>
+        <button aria-label="Remove Ravi" style="width: 48px; height: 48px; border: 0; background: transparent; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#54567a" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"></path></svg></button>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; min-height: 48px; border-top: 1px solid #d6d7e6">
+        <span style="width: 40px; height: 40px; flex: none; border-radius: 999px; background: #e4e5f8; color: #2b2f8f; font-size: 14px; line-height: 40px; font-weight: 600; text-align: center">AI</span>
+        <span style="flex: 1; min-width: 0; display: flex; flex-direction: column"><span style="font-weight: 600">Ananya Iyer</span><span style="font-size: 13px; line-height: 18px; color: #54567a">ananya.iyer@gmail.com</span></span>
+        <button aria-label="Remove Ananya" style="width: 48px; height: 48px; border: 0; background: transparent; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#54567a" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"></path></svg></button>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; min-height: 48px; border-top: 1px solid #d6d7e6">
+        <span style="width: 40px; height: 40px; flex: none; border-radius: 999px; background: #e4e5f8; color: #2b2f8f; font-size: 14px; line-height: 40px; font-weight: 600; text-align: center">AM</span>
+        <span style="flex: 1; min-width: 0; display: flex; flex-direction: column"><span style="font-weight: 600">Arjun Mehta</span><span style="font-size: 13px; line-height: 18px; color: #54567a">+91 99000 45678</span></span>
+        <button aria-label="Remove Arjun" style="width: 48px; height: 48px; border: 0; background: transparent; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#54567a" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"></path></svg></button>
+      </div>
+    </div>
+  </div>
+
+  <div style="flex: 1"></div>
+  <div style="padding: 16px 16px 32px; background: #f5f5fb; border-top: 1px solid #d6d7e6">
+    <a href="GroupExpenses.dc.html" style="min-height: 48px; border-radius: 14px; background: #2b2f8f; color: #ffffff; display: flex; align-items: center; justify-content: center; text-decoration: none; font-size: 16px; line-height: 24px; font-weight: 600">Create group</a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

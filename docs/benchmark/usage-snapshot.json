@@ -1,100 +1,82 @@
 {
   "per_stage_model": [
     {
-      "stage": "0-false-start",
-      "model": "claude-opus-5-5",
-      "requests": 14,
-      "input": 35,
-      "cache_write": 95468,
-      "cache_read": 1759786,
-      "output": 6491,
-      "cost_usd": 1.25
+      "stage": "0-briefing",
+      "model": "claude-fable-5-2",
+      "input": 10,
+      "cache_write": 43522,
+      "cache_read": 382430,
+      "output": 1692,
+      "requests": 4,
+      "cost_usd": 0.84
     },
     {
       "stage": "1-plan",
-      "model": "claude-opus-5-5",
+      "model": "claude-fable-5-2",
+      "input": 13,
+      "cache_write": 38223,
+      "cache_read": 720976,
+      "output": 9020,
       "requests": 6,
-      "input": 11,
-      "cache_write": 10663,
-      "cache_read": 966716,
-      "output": 8164,
-      "cost_usd": 0.44
+      "cost_usd": 1.12
+    },
+    {
+      "stage": "2-design",
+      "model": "claude-fable-5-2",
+      "input": 24,
+      "cache_write": 61569,
+      "cache_read": 1855198,
+      "output": 24633,
+      "requests": 10,
+      "cost_usd": 2.34
     },
     {
       "stage": "2-design",
       "model": "claude-opus-5-5",
-      "requests": 4,
-      "input": 8,
-      "cache_write": 2589,
-      "cache_read": 676496,
-      "output": 7174,
-      "cost_usd": 0.3
+      "input": 32,
+      "cache_write": 221095,
+      "cache_read": 4206207,
+      "output": 65617,
+      "requests": 18,
+      "cost_usd": 3.92
     },
     {
       "stage": "3-build",
       "model": "claude-opus-5-5",
-      "requests": 49,
-      "input": 91,
-      "cache_write": 160323,
-      "cache_read": 12688189,
-      "output": 141880,
-      "cost_usd": 6.66
-    },
-    {
-      "stage": "4-fixes",
-      "model": "claude-opus-5-5",
-      "requests": 26,
-      "input": 49,
-      "cache_write": 32032,
-      "cache_read": 9134336,
-      "output": 20047,
-      "cost_usd": 2.48
-    },
-    {
-      "stage": "5-host-and-report",
-      "model": "claude-opus-5-5",
-      "requests": 40,
-      "input": 78,
-      "cache_write": 66642,
-      "cache_read": 15753772,
-      "output": 27439,
-      "cost_usd": 4.23
+      "input": 259,
+      "cache_write": 389241,
+      "cache_read": 59099125,
+      "output": 262470,
+      "requests": 125,
+      "cost_usd": 20.18
     }
   ],
   "time": {
-    "0-false-start": {
-      "active_minutes": 3.2,
-      "wall_minutes": 15.6
+    "0-briefing": {
+      "active_minutes": 2.8,
+      "wall_minutes": 2.6
     },
     "1-plan": {
-      "active_minutes": 2.4,
-      "wall_minutes": 2.4
+      "active_minutes": 1.8,
+      "wall_minutes": 1.8
     },
     "2-design": {
-      "active_minutes": 1.3,
-      "wall_minutes": 1.3
+      "active_minutes": 15.3,
+      "wall_minutes": 38.6
     },
     "3-build": {
-      "active_minutes": 23.2,
-      "wall_minutes": 56.7
-    },
-    "4-fixes": {
-      "active_minutes": 15.6,
-      "wall_minutes": 15.6
-    },
-    "5-host-and-report": {
-      "active_minutes": 13.2,
-      "wall_minutes": 13.2
+      "active_minutes": 99.4,
+      "wall_minutes": 106.3
     }
   },
   "totals": {
-    "requests": 139,
-    "input": 272,
-    "cache_write": 367717,
-    "cache_read": 40979295,
-    "output": 211195,
-    "cost": 15.36,
-    "active_minutes": 58.9,
-    "wall_minutes": 104.8
+    "requests": 163,
+    "output_tokens": 363432,
+    "cache_read_tokens": 66263936,
+    "cache_write_tokens": 753650,
+    "input_tokens": 338,
+    "cost_usd": 28.4,
+    "active_minutes": 119.3,
+    "wall_minutes": 150.5
   }
 }

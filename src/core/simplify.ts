@@ -1,84 +1,89 @@
 import type { Paise } from './money';
 
-export interface Transfer { from: string; to: string; amount: Paise }
+export interface Transfer {
+  from: string;
+  to: string;
+  amount: Paise;
+}
 
-/** Above this many people with a non-zero balance we fall back to greedy matching. */
-export const EXACT_LIMIT = 16;
+/** Net position per user: positive = is owed money, negative = owes money. Must sum to 0. */
+export type Nets = Record<string, Paise>;
+
+const EXACT_LIMIT = 16;
 
 function greedy(entries: [string, number][]): Transfer[] {
-  const debt = entries.filter(([, v]) => v < 0).map(([k, v]) => ({ k, v: -v }));
-  const cred = entries.filter(([, v]) => v > 0).map(([k, v]) => ({ k, v }));
+  const debtors = entries.filter(([, v]) => v < 0).map(([u, v]) => ({ u, v: -v }));
+  const creditors = entries.filter(([, v]) => v > 0).map(([u, v]) => ({ u, v }));
+  const byAmount = (a: { u: string; v: number }, b: { u: string; v: number }) => b.v - a.v || (a.u < b.u ? -1 : 1);
   const out: Transfer[] = [];
-  for (;;) {
-    debt.sort((a, b) => b.v - a.v || a.k.localeCompare(b.k));
-    cred.sort((a, b) => b.v - a.v || a.k.localeCompare(b.k));
-    const d = debt[0];
-    const c = cred[0];
-    if (!d || !c || d.v === 0 || c.v === 0) break;
+  while (debtors.length && creditors.length) {
+    debtors.sort(byAmount);
+    creditors.sort(byAmount);
+    const d = debtors[0];
+    const c = creditors[0];
     const amt = Math.min(d.v, c.v);
-    out.push({ from: d.k, to: c.k, amount: amt });
+    out.push({ from: d.u, to: c.u, amount: amt });
     d.v -= amt;
     c.v -= amt;
-    if (d.v === 0) debt.shift();
-    if (c.v === 0) cred.shift();
+    if (d.v === 0) debtors.shift();
+    if (c.v === 0) creditors.shift();
   }
   return out;
 }
 
 /**
- * Fewest payments that clear every balance. `nets` maps person -> net (positive = is owed).
- * Exact: the minimum number of payments is n - k, where k is the largest number of disjoint
- * groups whose balances sum to zero. We find k with a subset DP (2^n states, n <= 16),
- * then settle each zero-sum group greedily (a group of size m needs m - 1 payments).
+ * Smallest set of transfers that clears every debt.
+ * The minimum equals (people with a non-zero balance) minus (the largest number of
+ * disjoint zero-sum groups they can be split into). That partition is found exactly
+ * with a subset DP for up to 16 people; above that, greedy matching is used (at most n-1 transfers).
  */
-export function simplifyDebts(nets: Record<string, Paise>): Transfer[] {
-  const entries = Object.entries(nets).filter(([, v]) => v !== 0).sort(([a], [b]) => a.localeCompare(b));
-  const sum = entries.reduce((a, [, v]) => a + v, 0);
-  if (sum !== 0) throw new Error('balances do not add up to zero');
+export function simplifyDebts(nets: Nets): Transfer[] {
+  const entries = Object.entries(nets)
+    .filter(([, v]) => v !== 0)
+    .sort(([a], [b]) => (a < b ? -1 : 1));
+  const total = entries.reduce((a, [, v]) => a + v, 0);
+  if (total !== 0) throw new Error(`balances do not sum to zero (${total})`);
   const n = entries.length;
   if (n === 0) return [];
   if (n > EXACT_LIMIT) return greedy(entries);
 
-  const full = (1 << n) - 1;
-  const sums = new Float64Array(1 << n);
-  for (let m = 1; m <= full; m++) {
+  const size = 1 << n;
+  const sum = new Array<number>(size).fill(0);
+  for (let m = 1; m < size; m++) {
     const low = m & -m;
-    sums[m] = sums[m ^ low] + entries[31 - Math.clz32(low)][1];
+    sum[m] = sum[m ^ low] + entries[31 - Math.clz32(low)][1];
   }
-  // dp[m] = max number of zero-sum groups that m can be split into (only meaningful when sums[m] == 0)
-  const dp = new Int8Array(1 << n).fill(-1);
-  const choice = new Int32Array(1 << n);
-  dp[0] = 0;
-  for (let m = 1; m <= full; m++) {
-    if (sums[m] !== 0) continue;
-    // Always include the lowest set bit in the sub-group to avoid counting orders twice.
-    const low = m & -m;
-    const rest = m ^ low;
-    for (let s = rest; ; s = (s - 1) & rest) {
-      const g = s | low;
-      if (sums[g] === 0 && dp[m ^ g] >= 0 && dp[m ^ g] + 1 > dp[m]) {
-        dp[m] = dp[m ^ g] + 1;
-        choice[m] = g;
+  const dp = new Int16Array(size);
+  const pick = new Int8Array(size);
+  for (let m = 1; m < size; m++) {
+    let best = -1;
+    let bi = 0;
+    for (let i = 0; i < n; i++) {
+      if (m & (1 << i)) {
+        const v = dp[m ^ (1 << i)];
+        if (v > best) {
+          best = v;
+          bi = i;
+        }
       }
-      if (s === 0) break;
+    }
+    dp[m] = best + (sum[m] === 0 ? 1 : 0);
+    pick[m] = bi;
+  }
+  // Reconstruct an order whose zero prefix sums mark the groups.
+  const order: number[] = [];
+  for (let m = size - 1; m; m ^= 1 << pick[m]) order.push(pick[m]);
+  order.reverse();
+  const out: Transfer[] = [];
+  let group: [string, number][] = [];
+  let run = 0;
+  for (const i of order) {
+    group.push(entries[i]);
+    run += entries[i][1];
+    if (run === 0) {
+      out.push(...greedy(group));
+      group = [];
     }
   }
-  const out: Transfer[] = [];
-  for (let m = full; m; m ^= choice[m]) {
-    const g = choice[m];
-    const members: [string, number][] = [];
-    for (let i = 0; i < n; i++) if (g & (1 << i)) members.push(entries[i]);
-    out.push(...greedy(members));
-  }
   return out;
-}
-
-/** Net balance per person from transfers, for checking. */
-export function applyTransfers(nets: Record<string, Paise>, ts: Transfer[]): Record<string, Paise> {
-  const r = { ...nets };
-  for (const t of ts) {
-    r[t.from] = (r[t.from] ?? 0) + t.amount;
-    r[t.to] = (r[t.to] ?? 0) - t.amount;
-  }
-  return r;
 }

@@ -1,108 +1,112 @@
-import { useQueryClient } from '@tanstack/react-query';
+import * as Sentry from '@sentry/react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
-import { formatPhone, isValidUpiId, normalizeIndianPhone } from '@/core';
-import { Avatar, Button, Card, ErrorBox, Field, InfoBox, Loading, Screen, Segmented, T } from '@/components/ui';
-import { keys, useMe } from '@/lib/api';
-import { logOut } from '@/lib/auth';
-import { friendlyError } from '@/lib/errors';
-import { pickImage } from '@/lib/images';
-import { report, sentryOn } from '@/lib/sentry';
-import { supabase } from '@/lib/supabase';
-import { space, useColors } from '@/lib/theme';
+import { Avatar, Button, Field, Screen, Segmented, T } from '@/components/ui';
+import { isValidUpiId } from '@/core';
+import { setMyPhone, updateProfile, uploadAvatar } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
+import { errText } from '@/lib/errors';
+import { useSync } from '@/lib/offline';
+import { queryClient, qk } from '@/lib/query';
+import { space } from '@/theme';
 
 type Freq = 'daily' | 'weekly' | 'off';
+const FREQ_HELP: Record<Freq, string> = {
+  daily: 'Every morning while you owe money that is more than 3 days old.',
+  weekly: 'Once a week while you owe money that is more than 3 days old.',
+  off: 'No reminders. You still see what you owe on Home.',
+};
 
 export default function Profile() {
-  const c = useColors();
-  const qc = useQueryClient();
-  const me = useMe();
+  const { profile, session, signOut } = useAuth();
+  const { online } = useSync();
   const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
   const [upi, setUpi] = useState('');
+  const [phone, setPhone] = useState('');
   const [freq, setFreq] = useState<Freq>('daily');
+  const [msg, setMsg] = useState<{ text: string; bad: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
-  const [photoBusy, setPhotoBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
-  const [crash, setCrash] = useState(false);
+  const [crashArmed, setCrashArmed] = useState(false);
 
   useEffect(() => {
-    if (!me.data) return;
-    setName(me.data.full_name ?? '');
-    setPhone(me.data.phone ? me.data.phone.replace(/^91/, '') : '');
-    setUpi(me.data.upi_id ?? '');
-    setFreq((me.data.reminder_freq as Freq) ?? 'daily');
-  }, [me.data]);
+    if (!profile) return;
+    setName(profile.full_name);
+    setUpi(profile.upi_id ?? '');
+    setFreq(profile.reminder_frequency ?? 'daily');
+  }, [profile]);
 
-  if (crash) throw new Error('Test crash from the Profile screen (SplitIt crash-report check)');
+  const refresh = () => queryClient.invalidateQueries({ queryKey: qk.profile(session!.user.id) });
 
-  const phoneErr = phone && !normalizeIndianPhone(phone) ? 'Enter a 10-digit Indian mobile number.' : null;
-  const upiErr = upi && !isValidUpiId(upi) ? 'A UPI ID looks like name@bank (for example priya@okhdfcbank).' : null;
-
-  async function save(avatarUrl?: string) {
-    setError(null); setSaved(false);
-    if (!name.trim()) return setError('Please enter your name.');
-    if (phoneErr || upiErr) return;
+  const save = async () => {
+    setMsg(null);
+    if (!name.trim()) return setMsg({ text: 'Enter your name.', bad: true });
+    if (upi.trim() && !isValidUpiId(upi)) return setMsg({ text: 'Check the UPI ID. It should look like name@bank.', bad: true });
     setBusy(true);
-    const { error: e } = await supabase.rpc('update_profile', {
-      p_full_name: name.trim(), p_phone: phone ? normalizeIndianPhone(phone) : null, p_upi_id: upi.trim() || null, p_reminder_freq: freq, p_avatar_url: avatarUrl ?? null,
-    });
-    setBusy(false);
-    if (e) return setError(friendlyError(e));
-    setSaved(true);
-    qc.invalidateQueries({ queryKey: keys.me });
-    qc.invalidateQueries({ queryKey: ['group'] });
-  }
-
-  async function photo(camera: boolean) {
-    setError(null);
     try {
-      const img = await pickImage({ camera, maxBytes: 500_000, maxSide: 512, square: true });
-      if (!img || !me.data) return;
-      setPhotoBusy(true);
-      const path = `${me.data.id}/${Date.now()}.jpg`;
-      const { error: e } = await supabase.storage.from('avatars').upload(path, img.bytes, { contentType: 'image/jpeg' });
-      if (e) throw e;
-      const url = supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl;
-      await save(url);
+      await updateProfile(session!.user.id, { full_name: name.trim(), upi_id: upi.trim() || null, reminder_frequency: freq });
+      if (!profile?.phone && phone.trim()) await setMyPhone(phone);
+      await refresh();
+      setMsg({ text: 'Saved.', bad: false });
     } catch (e) {
-      setError(friendlyError(e));
+      setMsg({ text: errText(e), bad: true });
     } finally {
-      setPhotoBusy(false);
+      setBusy(false);
     }
-  }
+  };
 
-  if (me.isLoading) return <Screen back={false} title="Profile"><Loading /></Screen>;
+  const changePhoto = async () => {
+    setMsg(null);
+    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.5 });
+    if (res.canceled || !res.assets[0]) return;
+    const a = res.assets[0];
+    try {
+      const url = await uploadAvatar(session!.user.id, a.uri, a.mimeType === 'image/png' ? 'image/png' : 'image/jpeg');
+      await updateProfile(session!.user.id, { avatar_url: url });
+      await refresh();
+    } catch (e) {
+      setMsg({ text: errText(e), bad: true });
+    }
+  };
+
   return (
-    <Screen back={false} title="Profile">
-      <View style={{ alignItems: 'center', gap: space(2) }}>
-        <Avatar name={me.data?.full_name} url={me.data?.avatar_url} size={88} />
-        <View style={{ flexDirection: 'row', gap: space(2) }}>
-          <Button title="Take photo" small variant="secondary" onPress={() => photo(true)} loading={photoBusy} />
-          <Button title="Choose photo" small variant="secondary" onPress={() => photo(false)} loading={photoBusy} />
-        </View>
+    <Screen title="Profile"
+      footer={<View style={{ gap: space[2] }}>
+        {msg ? <T color={msg.bad ? 'danger' : 'positive'}>{msg.text}</T> : null}
+        <Button label="Save changes" onPress={save} loading={busy} disabled={!online} />
+        {!online ? <T v="caption" color="muted">Saving your profile needs a connection.</T> : null}
+      </View>}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[4] }}>
+        <Avatar name={profile?.full_name ?? ''} uri={profile?.avatar_url} size={64} />
+        <Button small variant="secondary" label="Change photo" onPress={changePhoto} disabled={!online} />
       </View>
-      <Field label="Name" value={name} onChangeText={setName} autoComplete="name" />
-      <Field label="Mobile number" value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="98xxx xxxxx" error={phoneErr}
-        hint={me.data?.phone ? `Saved as ${formatPhone(me.data.phone)}` : 'Add it so friends can add you by number.'} />
-      <Field label="Email" value={me.data?.email ?? ''} editable={false} hint="Used to log in and for password reset." />
-      <Field label="UPI ID" value={upi} onChangeText={setUpi} autoCapitalize="none" autoCorrect={false} placeholder="name@okhdfcbank" error={upiErr}
-        hint="Friends pay you here. SplitIt never touches the money." />
-      <View style={{ gap: space(1) }}>
-        <T v="label">Payment reminders</T>
-        <Segmented label="Reminder frequency" value={freq} onChange={setFreq} options={[{ key: 'daily', label: 'Daily' }, { key: 'weekly', label: 'Weekly' }, { key: 'off', label: 'Off' }]} />
-        <T v="small">When you owe money for more than 3 days, we remind you at 9:00 am IST by email and in the app.</T>
+      <Field label="Full name" value={name} onChangeText={setName} maxLength={80} />
+      {profile?.phone
+        ? <Field label="Phone" value={profile.phone.replace(/^\+91/, '+91 ')} editable={false} help="You log in with this number." />
+        : <Field label="Phone" value={phone} onChangeText={setPhone} keyboardType="phone-pad" help="Add your mobile number so friends can add you to groups." />}
+      <Field label="Email" value={profile?.email ?? ''} editable={false} help="Password resets and payment messages go here." />
+      <Field label="UPI ID" value={upi} onChangeText={setUpi} autoCapitalize="none" placeholder="name@oksbi"
+        help="Friends pay you here. Without it, they can only settle with you in cash." />
+      <View style={{ gap: space[1] }}>
+        <Segmented label="Remind me about money I owe" value={freq} onChange={setFreq}
+          options={[{ value: 'daily', label: 'Daily' }, { value: 'weekly', label: 'Weekly' }, { value: 'off', label: 'Off' }]} />
+        <T v="caption" color="muted">{FREQ_HELP[freq]}</T>
       </View>
-      <ErrorBox message={error} />
-      {saved && <InfoBox tone="ok"><T>Saved.</T></InfoBox>}
-      <Button title="Save changes" onPress={() => save()} loading={busy} />
-      <Card style={{ marginTop: space(4) }}>
-        <Button title="Log out" variant="secondary" onPress={logOut} />
-        <Pressable accessibilityRole="button" onPress={() => { report(new Error('Test error report from Profile (handled)'), 'profile'); setCrash(true); }} style={{ minHeight: 48, justifyContent: 'center', alignItems: 'center' }}>
-          <T v="small" color={c.muted}>Send a test crash report{sentryOn ? '' : ' (crash reporting is not set up yet)'}</T>
+      <Button variant="danger" label="Log out" onPress={() => void signOut()} />
+
+      <View style={{ gap: space[2] }}>
+        <T v="overline" color="muted">Support</T>
+        <Pressable accessibilityRole="button" onPress={() => {
+          if (!crashArmed) return setCrashArmed(true);
+          Sentry.captureMessage('Test crash requested from Profile');
+          throw new Error('SplitIt test crash from the Profile screen');
+        }}>
+          <T v="label" color="brand">{crashArmed ? 'Tap again to send a test crash report' : 'Send a test crash report'}</T>
         </Pressable>
-      </Card>
+        {crashArmed ? (
+          <Button small variant="quiet" label="Crash the app natively (Android/iOS builds)" onPress={() => Sentry.nativeCrash()} />
+        ) : null}
+      </View>
     </Screen>
   );
 }

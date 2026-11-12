@@ -1,72 +1,106 @@
 import { router } from 'expo-router';
-import { Pressable, View } from 'react-native';
-import { formatINR } from '@/core';
-import { Button, Card, Empty, ErrorBox, InfoBox, Loading, NetText, Screen, T } from '@/components/ui';
-import { useMe, useMyGroups, useNotifications } from '@/lib/api';
-import { friendlyError } from '@/lib/errors';
-import { useLiveGroups } from '@/lib/realtime';
-import { MIN_TOUCH, space, useColors } from '@/lib/theme';
-import { GROUP_TYPES } from '@/lib/types';
+import { Bell, Plus } from 'lucide-react-native';
+import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Button, Card, ErrorView, Loading, Money, OfflineBanner, Pill, Row, SplitDisc, T } from '@/components/ui';
+import { useAuth } from '@/lib/auth';
+import { useMyGroups, useUnreadCount } from '@/lib/hooks';
+import { radius, space, useColors } from '@/theme';
 
 export default function Home() {
   const c = useColors();
   const groups = useMyGroups();
-  const me = useMe();
-  const unread = (useNotifications().data ?? []).filter((n) => !n.read_at).length;
-  useLiveGroups((groups.data ?? []).map((g) => g.id));
+  const { profile } = useAuth();
+  const unread = useUnreadCount();
   const list = groups.data ?? [];
-  const total = list.reduce((a, g) => a + Number(g.my_net), 0);
-  const owedSomewhere = list.some((g) => Number(g.my_net) > 0);
+  const owed = list.filter((g) => g.my_net > 0).reduce((a, g) => a + Number(g.my_net), 0);
+  const owe = list.filter((g) => g.my_net < 0).reduce((a, g) => a - Number(g.my_net), 0);
+  const net = owed - owe;
 
   return (
-    <Screen back={false} title={`Hi ${me.data?.full_name?.split(' ')[0] ?? ''}`.trim()}
-      right={
+    <SafeAreaView style={{ flex: 1, backgroundColor: c.ground }} edges={['top', 'left', 'right']}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: space[4], paddingTop: space[2] }}>
+        <T v="title" style={{ fontFamily: 'AnekLatin_700Bold' }}>SplitIt</T>
         <Pressable accessibilityRole="button" accessibilityLabel={`Notifications, ${unread} unread`} onPress={() => router.push('/activity')}
-          style={{ minWidth: MIN_TOUCH, height: MIN_TOUCH, alignItems: 'center', justifyContent: 'center' }}>
-          <T v="h2">🔔</T>
+          style={{ width: 48, height: 48, alignItems: 'center', justifyContent: 'center' }}>
+          <Bell color={c.ink} size={24} strokeWidth={1.75} />
           {unread > 0 && (
-            <View style={{ position: 'absolute', top: 4, right: 2, backgroundColor: c.danger, borderRadius: 10, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 }}>
-              <T v="label" color="#fff" style={{ fontSize: 12 }}>{unread}</T>
+            <View style={{ position: 'absolute', top: 6, right: 4, minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 5, backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center' }}>
+              <T v="overline" style={{ color: c.onAccent, letterSpacing: 0 }}>{unread > 99 ? '99+' : String(unread)}</T>
             </View>
           )}
         </Pressable>
-      }>
-      <Card style={{ backgroundColor: c.surface2 }}>
-        <T v="label">Across all your groups</T>
-        <NetText net={total} big />
-      </Card>
-      {owedSomewhere && me.data && !me.data.upi_id && (
-        <InfoBox tone="warn">
-          <T>People owe you money. Add your UPI ID so they can pay you straight from their UPI app.</T>
-          <Button title="Add UPI ID" small variant="teal" style={{ alignSelf: 'flex-start' }} onPress={() => router.push('/profile')} />
-        </InfoBox>
-      )}
-      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        <T v="h2" style={{ flex: 1 }}>Your groups</T>
-        <Button title="+ New group" small variant="teal" onPress={() => router.push('/group/new')} />
       </View>
-      {groups.isLoading && <Loading />}
-      {groups.error && !groups.data && <ErrorBox message={friendlyError(groups.error)} onRetry={() => groups.refetch()} />}
-      {groups.data && list.length === 0 && (
-        <Empty title="No groups yet" text="Make a group for a trip, your flat or anything you share, then add friends."
-          action={<Button title="Create a group" onPress={() => router.push('/group/new')} />} />
-      )}
-      {list.map((g) => {
-        const t = GROUP_TYPES.find((x) => x.key === g.type);
-        return (
-          <Card key={g.id} onPress={() => router.push(`/group/${g.id}`)} label={`${g.name}, ${g.member_count} members`}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space(3) }}>
-              <T v="h2">{t?.emoji}</T>
-              <View style={{ flex: 1, gap: 2 }}>
-                <T v="h2" numberOfLines={1}>{g.name}</T>
-                <T v="small">{t?.label} · {g.member_count} {g.member_count === 1 ? 'member' : 'members'}</T>
+      <OfflineBanner />
+      <ScrollView contentContainerStyle={{ padding: space[4], gap: space[6], paddingBottom: 120 }}
+        refreshControl={<RefreshControl refreshing={groups.isRefetching} onRefresh={() => void groups.refetch()} />}>
+        {groups.isLoading ? <Loading /> : groups.error && !groups.data ? <ErrorView error={groups.error} onRetry={() => void groups.refetch()} /> : (
+          <>
+            <Card style={{ padding: space[4], gap: space[1] }}>
+              <T v="caption" color="muted">Across all your groups</T>
+              {net === 0 ? (
+                <T v="amountXl" color="muted">settled up</T>
+              ) : (
+                <>
+                  <T v="bodyStrong" color={net > 0 ? 'positive' : 'negative'}>{net > 0 ? 'you are owed' : 'you owe'}</T>
+                  <Money paise={net} abs v="amountXl" color={net > 0 ? 'positive' : 'negative'} />
+                </>
+              )}
+              {(owed > 0 || owe > 0) && (
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2], paddingTop: space[2] }}>
+                  {owed > 0 && <Pill tone="owed">owed to you <Money paise={owed} v="amountSm" color="positive" /></Pill>}
+                  {owe > 0 && <Pill tone="owe">you owe <Money paise={owe} v="amountSm" color="negative" /></Pill>}
+                </View>
+              )}
+            </Card>
+
+            {owed > 0 && profile && !profile.upi_id ? (
+              <Card style={{ padding: space[4], gap: space[3], backgroundColor: c.accentSoft, borderColor: c.accentSoft }}>
+                <T v="bodyStrong" color="pending">Add your UPI ID so friends can pay you</T>
+                <T v="label" color="pending">You are owed <Money paise={owed} v="amountSm" color="pending" />. Without a UPI ID, people can only settle with you in cash.</T>
+                <Button small label="Add UPI ID" onPress={() => router.push('/profile')} style={{ alignSelf: 'flex-start' }} />
+              </Card>
+            ) : null}
+
+            {list.length === 0 ? (
+              <Card style={{ padding: space[6], gap: space[4], alignItems: 'flex-start' }}>
+                <SplitDisc size={48} />
+                <T v="heading">No groups yet</T>
+                <T color="muted">Create a group for your flat, a trip or a dinner, add friends, and start splitting.</T>
+                <Button label="Create a group" onPress={() => router.push('/group/new')} />
+              </Card>
+            ) : (
+              <View style={{ gap: space[2] }}>
+                <T v="heading">Your groups</T>
+                <Card>
+                  {list.map((g, i) => (
+                    <Row key={g.id} first={i === 0} onPress={() => router.push(`/group/${g.id}`)} label={`${g.name}, ${g.member_count} members`}>
+                      <SplitDisc />
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <T v="heading" lines={1}>{g.name}</T>
+                        <T v="caption" color="muted">{g.member_count} {g.member_count === 1 ? 'member' : 'members'}</T>
+                      </View>
+                      {Number(g.my_net) === 0 ? <T v="caption" color="muted">settled up</T> : (
+                        <View style={{ alignItems: 'flex-end' }}>
+                          <T v="caption" color={g.my_net > 0 ? 'positive' : 'negative'}>{g.my_net > 0 ? 'you are owed' : 'you owe'}</T>
+                          <Money paise={Number(g.my_net)} abs color={g.my_net > 0 ? 'positive' : 'negative'} />
+                        </View>
+                      )}
+                    </Row>
+                  ))}
+                </Card>
               </View>
-            </View>
-            <NetText net={Number(g.my_net)} />
-          </Card>
-        );
-      })}
-      {list.length > 0 && <T v="small" style={{ textAlign: 'center' }}>Total of all groups: {formatINR(Math.abs(total))} {total > 0 ? 'owed to you' : total < 0 ? 'you owe' : ''}</T>}
-    </Screen>
+            )}
+          </>
+        )}
+      </ScrollView>
+      {list.length > 0 && (
+        <Pressable accessibilityRole="button" accessibilityLabel="New group" onPress={() => router.push('/group/new')}
+          style={{ position: 'absolute', right: space[4], bottom: space[4], height: 56, paddingHorizontal: 20, borderRadius: radius.full, backgroundColor: c.brand, flexDirection: 'row', alignItems: 'center', gap: space[2], elevation: 3, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } }}>
+          <Plus color={c.onBrand} size={22} strokeWidth={2} />
+          <T v="bodyStrong" style={{ color: c.onBrand }}>New group</T>
+        </Pressable>
+      )}
+    </SafeAreaView>
   );
 }

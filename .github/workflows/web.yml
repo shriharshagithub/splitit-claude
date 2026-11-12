@@ -1,18 +1,22 @@
-# Publishes the website on GitHub Pages: works on any phone (including iPhone) and computer.
-name: Website
+# Publishes the web version to GitHub Pages (used on iPhone/desktop and for invite and email links).
+# One-time setup: repository Settings > Pages > Source: GitHub Actions.
+name: Web app
 on:
   push:
-    paths-ignore: ['docs/**', '**.md', 'supabase/**', 'tests/**']
+    branches: [main, 'claude/**']
+    paths-ignore: ['docs/**', 'supabase/**', '**.md']
   workflow_dispatch:
 permissions:
   contents: read
   pages: write
   id-token: write
-concurrency: { group: pages, cancel-in-progress: false }
+concurrency: { group: pages, cancel-in-progress: false }  # never cut a Pages deploy off halfway
 jobs:
   build:
     runs-on: ubuntu-latest
     env:
+      EXPO_PUBLIC_SUPABASE_URL: https://lzczfbpiolguerdbsvjy.supabase.co
+      EXPO_PUBLIC_SUPABASE_KEY: sb_publishable_CxlMuxufV1STW8gDdlED8A_kOSXuSxX
       EXPO_PUBLIC_SENTRY_DSN: ${{ vars.SENTRY_DSN }}
     steps:
       - uses: actions/checkout@v4
@@ -20,7 +24,7 @@ jobs:
         with: { node-version: 22, cache: npm }
       - run: npm ci
       - run: npx expo export --platform web --output-dir dist
-      - name: Deep links (/group/..., /join/...) open the app
+      - name: Single-page app fallback for deep links (/group/..., /invite/...)
         run: cp dist/index.html dist/404.html && touch dist/.nojekyll
       - uses: actions/upload-pages-artifact@v3
         with: { path: dist }

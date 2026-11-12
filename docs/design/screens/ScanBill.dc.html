@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Scan bill</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anek+Latin:wght@600;700&family=JetBrains+Mono:wght@500;600&family=Mukta:wght@400;500;600&display=swap">
+<style>
+body{margin:0}
+a{color:#2b2f8f}a:hover{color:#15163a}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #f5f5fb; color: #15163a; font-family: Mukta, 'Noto Sans', system-ui, sans-serif; display: flex; flex-direction: column; overflow: hidden">
+  <div style="display: flex; align-items: center; gap: 4px; padding: 16px 8px 4px">
+    <a href="GroupExpenses.dc.html" aria-label="Close" style="width: 48px; height: 48px; display: flex; align-items: center; justify-content: center">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#15163a" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+    </a>
+    <div style="display: flex; flex-direction: column">
+      <h1 style="margin: 0; font-family: 'Anek Latin', system-ui, sans-serif; font-size: 22px; line-height: 28px; font-weight: 600">Scan bill</h1>
+      <span style="font-size: 13px; line-height: 18px; color: #54567a">Goa Trip</span>
+    </div>
+  </div>
+
+  <div style="margin: 4px 16px 0; display: flex; align-items: center; gap: 12px; background: #ffffff; border: 1px solid #d6d7e6; border-radius: 14px; padding: 8px 12px">
+    <span aria-hidden="true" style="width: 44px; height: 56px; flex: none; border-radius: 8px; background: #e9eaf4; display: flex; align-items: center; justify-content: center">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#54567a" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3v18l2-1.5L9 21l2-1.5L13 21l2-1.5L17 21l2-1.5V3"></path><path d="M9 8h6M9 12h6M9 16h3"></path></svg>
+    </span>
+    <span style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+      <span style="font-weight: 600">Read 4 items from your photo</span>
+      <span style="font-size: 13px; line-height: 18px; color: #54567a">Check each line and fix anything that looks wrong.</span>
+    </span>
+    <button style="flex: none; min-height: 36px; padding: 0 12px; border: 0; background: transparent; color: #2b2f8f; font-family: Mukta, sans-serif; font-size: 14px; line-height: 20px; font-weight: 600">Retake</button>
+  </div>
+
+  <div style="margin: 12px 16px 0; background: #ffffff; border: 1px solid #d6d7e6; border-radius: 14px; overflow: hidden">
+    <sc-for list="{{items}}" as="it" hint-placeholder-count="4">
+      <div style="{{it.rowStyle}}">
+        <div style="display: flex; align-items: center; gap: 8px">
+          <input aria-label="Item name" value="{{it.name}}" style="flex: 1; min-width: 0; font-family: Mukta, sans-serif; font-size: 16px; line-height: 24px; color: #15163a; border: 0; border-bottom: 1px dashed #84869f; background: transparent; padding: 0">
+          <input aria-label="Item amount" value="{{it.amount}}" style="width: 96px; text-align: right; font-family: 'JetBrains Mono', monospace; font-size: 15px; line-height: 24px; font-weight: 500; color: #15163a; border: 0; border-bottom: 1px dashed #84869f; background: transparent; padding: 0">
+        </div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap">
+          <sc-for list="{{it.chips}}" as="c" hint-placeholder-count="5">
+            <button aria-pressed="{{c.pressed}}" onClick="{{c.toggle}}" style="{{c.style}}">{{c.label}}</button>
+          </sc-for>
+        </div>
+      </div>
+    </sc-for>
+    <div style="display: flex; flex-direction: column; gap: 4px; padding: 12px 16px; border-top: 1px solid #d6d7e6; font-size: 14px; line-height: 20px; color: #54567a">
+      <div style="display: flex; justify-content: space-between"><span>Items</span><span style="font-family: 'JetBrains Mono', monospace">{{itemsTotal}}</span></div>
+      <div style="display: flex; justify-content: space-between"><span>GST 5%</span><span style="font-family: 'JetBrains Mono', monospace">₹64.50</span></div>
+      <div style="display: flex; justify-content: space-between"><span>Service charge 10%</span><span style="font-family: 'JetBrains Mono', monospace">₹129.00</span></div>
+      <div style="display: flex; justify-content: space-between; color: #15163a; font-weight: 600"><span>Bill total</span><span style="font-family: 'JetBrains Mono', monospace">{{billTotal}}</span></div>
+    </div>
+  </div>
+
+  <div style="margin: 12px 16px 0; display: flex; flex-direction: column; gap: 6px">
+    <span style="font-size: 14px; line-height: 20px; font-weight: 500">Each person pays, with tax and service shared by what they ordered</span>
+    <div style="display: flex; gap: 8px; flex-wrap: wrap">
+      <sc-for list="{{people}}" as="p" hint-placeholder-count="3">
+        <span style="background: #ffffff; border: 1px solid #d6d7e6; border-radius: 999px; padding: 4px 12px; font-size: 14px; line-height: 20px; white-space: nowrap">{{p.name}} <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500">{{p.amount}}</span></span>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="flex: 1"></div>
+  <div style="padding: 12px 16px 32px; border-top: 1px solid #d6d7e6; display: flex; flex-direction: column; gap: 8px">
+    <a href="GroupExpenses.dc.html" style="min-height: 48px; border-radius: 14px; background: #2b2f8f; color: #ffffff; display: flex; align-items: center; justify-content: center; text-decoration: none; font-size: 16px; line-height: 24px; font-weight: 600">Create expense for {{billTotal}}</a>
+    <span style="font-size: 13px; line-height: 18px; color: #54567a; text-align: center">If a bill cannot be read, this same list opens empty for you to fill in.</span>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { assign: [[0, 1], [0, 1, 2], [2], [0, 1, 2]] };
+  }
+  fmt(p) {
+    var r = String(Math.floor(p / 100)), d = String(p % 100).padStart(2, '0');
+    var last = r.slice(-3), rest = r.slice(0, -3);
+    if (rest) last = rest.replace(/\B(?=(\d{2})+(?!\d))/g, ',') + ',' + last;
+    return '₹' + last + '.' + d;
+  }
+  renderVals() {
+    var self = this;
+    var names = ['You', 'Ravi', 'Ananya', 'Arjun', 'Meera'];
+    var bill = [['Butter chicken', 42000], ['Garlic naan x4', 24000], ['Paneer tikka', 36000], ['Fresh lime soda x3', 27000]];
+    var extra = 6450 + 12900, assign = this.state.assign;
+    var sub = names.map(function () { return 0; });
+    bill.forEach(function (b, i) {
+      var who = assign[i]; if (!who.length) return;
+      var each = Math.floor(b[1] / who.length), rem = b[1] - each * who.length;
+      who.forEach(function (w, k) { sub[w] += each + (k === 0 ? rem : 0); });
+    });
+    var itemsTotal = sub.reduce(function (a, b) { return a + b; }, 0);
+    var share = sub.map(function (s) { return itemsTotal ? Math.floor(extra * s / itemsTotal) : 0; });
+    var left = extra - share.reduce(function (a, b) { return a + b; }, 0);
+    if (sub[0]) share[0] += left;
+    var items = bill.map(function (b, i) {
+      return {
+        name: b[0], amount: self.fmt(b[1]),
+        rowStyle: 'display: flex; flex-direction: column; gap: 8px; padding: 12px 16px' + (i ? '; border-top: 1px solid #d6d7e6' : ''),
+        chips: names.map(function (n, w) {
+          var on = assign[i].indexOf(w) >= 0;
+          return { label: n, pressed: on ? 'true' : 'false',
+            style: 'min-height: 32px; padding: 0 12px; border-radius: 999px; font-family: Mukta, sans-serif; font-size: 14px; line-height: 20px; font-weight: 500; cursor: pointer; ' + (on ? 'background: #e4e5f8; color: #2b2f8f; border: 1px solid #2b2f8f' : 'background: #ffffff; color: #54567a; border: 1px solid #d6d7e6'),
+            toggle: function () {
+              var a = assign.map(function (x) { return x.slice(); });
+              var at = a[i].indexOf(w);
+              if (at >= 0) a[i].splice(at, 1); else a[i].push(w);
+              a[i].sort();
+              self.setState({ assign: a });
+            } };
+        })
+      };
+    });
+    var people = names.map(function (n, w) { return { name: n, amount: self.fmt(sub[w] + share[w]), on: sub[w] > 0 }; })
+      .filter(function (p) { return p.on; });
+    return { items: items, people: people, itemsTotal: this.fmt(129000), billTotal: this.fmt(129000 + extra) };
+  }
+}
+</script>
+</body>
+</html>

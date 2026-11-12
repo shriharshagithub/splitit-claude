@@ -1,8 +1,7 @@
-# Checks on every push: types, unit tests (money, splits, fewest payments, UPI link, bill parsing, offline queue),
-# and that the server's copy of the shared logic matches the app's.
-name: Checks
+name: CI
 on:
   push:
+    branches: [main, 'claude/**']
   pull_request:
   workflow_dispatch:
 jobs:
@@ -15,7 +14,7 @@ jobs:
       - run: npm ci
       - name: Type-check
         run: npx tsc --noEmit
-      - name: Unit tests
+      - name: Unit tests (money, splits, simplification, bill parsing, offline queue)
         run: npx vitest run
-      - name: Server copy of shared logic is up to date
+      - name: Edge-function copies of shared code are up to date
         run: node scripts/sync-shared.mjs && git diff --exit-code supabase/functions/_shared/core

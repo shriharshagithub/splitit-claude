@@ -4,7 +4,7 @@ dist/
 web-build/
 android/
 ios/
-.env
 *.log
-expo-env.d.ts
-test-results/
+.env
+.env.local
+coverage/

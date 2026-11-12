@@ -1,65 +1,92 @@
 #!/usr/bin/env python3
-"""Tokens, cost and time per stage from a Claude Code session transcript (.jsonl).
-Usage: python3 scripts/usage-report.py <transcript.jsonl> docs/benchmark/stages.json
-Prices: USD per million tokens (Anthropic API list prices; same table as the first build's report)."""
-import json, sys
-from datetime import datetime, timezone
+"""Token, time and cost report from Claude Code session transcripts.
 
-PRICES = {  # input, cache write (1h), cache write (5m), cache read, output
-    'claude-opus-5-5': (4.0, 8.0, 5.0, 0.20, 20.0),
-    'claude-fable-5-2': (8.0, 16.0, 10.0, 0.20, 40.0),
+Usage: usage-report.py <transcript-dir> <stages.json> [--markdown]
+Counts each API response once (deduplicated by message id), subagent transcripts included.
+Active time = sum of gaps between consecutive transcript records that are shorter than 5 minutes
+(longer gaps are waiting on the person or idle).
+Prices: USD per million tokens, Anthropic first-party API list prices, Nov 2026.
+Cache writes are billed at 2x input (this session requested the 1-hour cache TTL).
+"""
+import json, sys, glob, os
+from collections import defaultdict
+from datetime import datetime
+
+PRICES = {  # input, cache_write_1h, cache_read, output
+    'claude-fable-5-2': (8.0, 16.0, 0.20, 40.0),
+    'claude-opus-5-5': (4.0, 8.0, 0.20, 20.0),
 }
+root, stages_file = sys.argv[1], sys.argv[2]
+md = '--markdown' in sys.argv
+stages = json.load(open(stages_file))
 ts = lambda s: datetime.fromisoformat(s.replace('Z', '+00:00'))
-stages = json.load(open(sys.argv[2]))
-bounds = [(s['name'], ts(s['start'])) for s in stages]
+
+seen, rows, stamps = set(), [], []
+for path in glob.glob(os.path.join(root, '**', '*.jsonl'), recursive=True):
+    for line in open(path, errors='ignore'):
+        try:
+            rec = json.loads(line)
+        except ValueError:
+            continue
+        if rec.get('timestamp') and rec.get('type') in ('user', 'assistant'):
+            stamps.append(rec['timestamp'])
+        msg = rec.get('message') or {}
+        u = msg.get('usage')
+        if rec.get('type') != 'assistant' or not u or msg.get('id') in seen:
+            continue
+        seen.add(msg['id'])
+        rows.append((rec['timestamp'], msg.get('model', '?'), u))
+
 def stage_of(t):
-    name = bounds[0][0]
-    for n, start in bounds:
-        if t >= start: name = n
+    name = stages[0]['name']
+    for s in stages:
+        if t >= s['start']:
+            name = s['name']
     return name
 
-seen, rows, times = set(), {}, []
-for line in open(sys.argv[1]):
-    try: e = json.loads(line)
-    except Exception: continue
-    t = e.get('timestamp')
-    if t: times.append(ts(t))
-    m = e.get('message') or {}
-    u = m.get('usage')
-    if e.get('type') != 'assistant' or not u: continue
-    mid = m.get('id') or e.get('uuid')
-    if mid in seen: continue
-    seen.add(mid)
-    st, model = stage_of(ts(t)), m.get('model', '?')
-    r = rows.setdefault((st, model), dict(requests=0, input=0, cache_write=0, cache_write_1h=0, cache_read=0, output=0))
-    cc = u.get('cache_creation') or {}
-    r['requests'] += 1
-    r['input'] += u.get('input_tokens', 0)
-    r['cache_write'] += u.get('cache_creation_input_tokens', 0)
-    r['cache_write_1h'] += cc.get('ephemeral_1h_input_tokens', u.get('cache_creation_input_tokens', 0) if not cc else 0)
-    r['cache_read'] += u.get('cache_read_input_tokens', 0)
-    r['output'] += u.get('output_tokens', 0)
+tok = defaultdict(lambda: defaultdict(int))
+for t, model, u in rows:
+    k = (stage_of(t), model)
+    tok[k]['input'] += u.get('input_tokens') or 0
+    tok[k]['cache_write'] += u.get('cache_creation_input_tokens') or 0
+    tok[k]['cache_read'] += u.get('cache_read_input_tokens') or 0
+    tok[k]['output'] += u.get('output_tokens') or 0
+    tok[k]['requests'] += 1
 
-out, tot = [], dict(requests=0, input=0, cache_write=0, cache_read=0, output=0, cost=0.0)
-for (st, model), r in sorted(rows.items()):
-    p = PRICES.get(model, PRICES['claude-opus-5-5'])
-    w1h = r['cache_write_1h']; w5m = r['cache_write'] - w1h
-    cost = (r['input'] * p[0] + w1h * p[1] + w5m * p[2] + r['cache_read'] * p[3] + r['output'] * p[4]) / 1e6
-    out.append(dict(stage=st, model=model, **{k: r[k] for k in ('requests', 'input', 'cache_write', 'cache_read', 'output')}, cost_usd=round(cost, 2)))
-    for k in ('requests', 'input', 'cache_write', 'cache_read', 'output'): tot[k] += r[k]
-    tot['cost'] += cost
+stamps.sort()
+active, wall = defaultdict(float), defaultdict(lambda: [None, None])
+for a, b in zip(stamps, stamps[1:]):
+    gap = (ts(b) - ts(a)).total_seconds()
+    st = stage_of(a)
+    if gap < 300:
+        active[st] += gap
+for s in stamps:
+    w = wall[stage_of(s)]
+    w[0] = w[0] or s
+    w[1] = s
 
-# time: wall = stage span; active = sum of gaps under 5 minutes between transcript events
-times.sort()
-tm = {}
-for a, b in zip(times, times[1:]):
-    s = stage_of(a)
-    d = tm.setdefault(s, dict(active=0.0, first=a, last=b))
-    gap = (b - a).total_seconds()
-    if gap < 300: d['active'] += gap
-    d['last'] = b
-time = {s: dict(active_minutes=round(d['active'] / 60, 1), wall_minutes=round((d['last'] - d['first']).total_seconds() / 60, 1)) for s, d in tm.items()}
-tot['cost'] = round(tot['cost'], 2)
-tot['active_minutes'] = round(sum(v['active_minutes'] for v in time.values()), 1)
-tot['wall_minutes'] = round((times[-1] - times[0]).total_seconds() / 60, 1)
-print(json.dumps(dict(per_stage_model=out, time=time, totals=tot), indent=2))
+def cost(model, d):
+    p = PRICES.get(model)
+    if not p:
+        return 0.0
+    return (d['input'] * p[0] + d['cache_write'] * p[1] + d['cache_read'] * p[2] + d['output'] * p[3]) / 1e6
+
+out = []
+for (st, model), d in sorted(tok.items()):
+    out.append({'stage': st, 'model': model, **d, 'cost_usd': round(cost(model, d), 2)})
+summary = {
+    'per_stage_model': out,
+    'time': {st: {'active_minutes': round(active[st] / 60, 1),
+                  'wall_minutes': round((ts(w[1]) - ts(w[0])).total_seconds() / 60, 1)} for st, w in sorted(wall.items())},
+    'totals': {
+        'requests': sum(r['requests'] for r in out),
+        'output_tokens': sum(r['output'] for r in out),
+        'cache_read_tokens': sum(r['cache_read'] for r in out),
+        'cache_write_tokens': sum(r['cache_write'] for r in out),
+        'input_tokens': sum(r['input'] for r in out),
+        'cost_usd': round(sum(r['cost_usd'] for r in out), 2),
+        'active_minutes': round(sum(active.values()) / 60, 1),
+        'wall_minutes': round((ts(stamps[-1]) - ts(stamps[0])).total_seconds() / 60, 1),
+    },
+}
+print(json.dumps(summary, indent=2))

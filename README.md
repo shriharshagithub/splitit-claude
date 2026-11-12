@@ -1,102 +1,126 @@
 # SplitIt
 
-Split group expenses with friends in India, and settle up over UPI. SplitIt works out who owes whom in the fewest payments. Money goes straight from one person's UPI app to the other's: SplitIt never holds or moves money.
+Group expense splitting for India. One person pays, SplitIt tracks who owes whom, and everyone settles over UPI. The app never holds or moves money.
 
-| | |
+- **App:** React Native with Expo (Android, iOS, and web from one codebase)
+- **Backend:** Supabase: Postgres with row-level security, Auth, Storage, Edge Functions, pg_cron
+- **Email:** Resend. **Bill reading:** OCR.space. **Crash reports:** Sentry.
+
+Product brief: [docs/PRD.md](docs/PRD.md). Build plan and decisions: [docs/PLAN.md](docs/PLAN.md). Designs: [docs/design](docs/design).
+
+## Try it
+
+| What | Where |
 | --- | --- |
-| **Website** (any phone, including iPhone, and computers) | https://shriharshagithub.github.io/splitit-claude |
-| **Android app** | GitHub → Actions → **Android APK** → latest successful run → Artifacts → `splitit-apk` (unzip, then open the `.apk` on the phone) |
-| **Backend** | Supabase project **Splitit-Claude-Code** (`ohawfftzgjuqwbilovmy`) |
-| **Plan, design, setup** | [docs/PLAN.md](docs/PLAN.md), [docs/DESIGN.md](docs/DESIGN.md), [docs/SETUP.md](docs/SETUP.md) |
-| **Product brief** | [docs/PRD.md](docs/PRD.md) |
-| **Build report** | [docs/REPORT.md](docs/REPORT.md) |
+| Android APK | GitHub → Actions → **Android APK** → latest run → Artifacts → `splitit-apk` |
+| Web (iPhone, desktop) | https://shriharshagithub.github.io/splitit-claude (after Pages is enabled, see below) |
+| iPhone without TestFlight | Run `npx expo start --tunnel` and scan the QR code with the free **Expo Go** app (needs a free Expo account). Native crash capture and the UPI app chooser only work in a real build. |
 
-## Try it with demo data
+Demo accounts (password `SplitIt@2026` for all). **These were removed from the live project on request so it could be used for real testing; run `supabase/seed.sql` to restore them.**
 
-Log in with any of these (password **`SplitIt@2026`**). Demo emails use `@example.com` and demo UPI IDs use `@example`, so nothing can ever reach a real person.
+| Name | Phone | Groups |
+| --- | --- | --- |
+| Priya Sharma | 98860 54321 | Goa Trip (admin), Flat 402 |
+| Ravi Kumar | 98450 12345 | Goa Trip, Flat 402 (admin) |
+| Ananya Iyer | 99000 11223 | Goa Trip |
+| Arjun Mehta | 99000 45678 | Goa Trip, Flat 402 |
+| Meera Nair | 98111 22334 | Goa Trip |
 
-| Name | Mobile number | Groups | Notes |
-| --- | --- | --- | --- |
-| Priya Sharma | 90000 00001 | Goa Trip (admin), Flat 402 | Owed the most |
-| Ravi Kumar | 90000 00002 | Goa Trip, Flat 402 (admin) | Has a cash payment from Arjun waiting for his confirmation |
-| Ananya Iyer | 90000 00003 | Goa Trip | Started a UPI payment to Priya |
-| Arjun Mehta | 90000 00004 | Goa Trip, Flat 402 | Owes the most; has no UPI ID (shows the "Ask Arjun to add a UPI ID" case) |
-| Meera Nair | 90000 00005 | Goa Trip | Has a confirmed payment to Priya |
-
-**To remove the demo data:** Supabase → SQL Editor → paste and run [supabase/clear-demo.sql](supabase/clear-demo.sql). To add it back, run [supabase/seed.sql](supabase/seed.sql).
+Demo accounts use `@example.com` addresses, so they never receive email, and `@example` UPI IDs, which no UPI app accepts, so a test payment can never reach a real person. To try a real UPI payment, put your own UPI ID on your own account and pay ₹1 from someone else's phone. Sign up with your own email to test password reset and payment emails.
 
 ## How it works
 
-- **Money** is whole paise everywhere (`bigint` in the database). Rupees only appear on screen (`₹1,23,456.78`) and in the UPI link.
-- **Splits**: equal, exact amounts, percentages and shares. The database function `compute_splits` is the source of truth; the app runs the same rules ([src/core/splits.ts](src/core/splits.ts)) for the live preview. Leftover paise go to the payer. A check that runs when each save is committed refuses any expense whose shares don't add up to its total.
-- **Fewest payments**: exact for up to 16 people with a balance (largest number of groups whose balances cancel out), greedy beyond that ([src/core/simplify.ts](src/core/simplify.ts)).
-- **Security**: row-level security on every table, so people can only read their own groups. The app cannot write to any table directly. Every change goes through a `security definer` database function that checks who is calling: only admins manage members, only the payer can mark a payment as paid, and only the receiver can confirm or decline it.
-- **Settle up**: the payer starts a payment (`pending`), pays in their UPI app, then marks it paid (`marked_paid`). The receiver confirms (`completed`, the debt clears) or declines (`declined`, the debt stays). Cash works the same way. Android (app and browser) opens the `upi://pay` link, which shows the phone's UPI apps; the Android manifest declares the `upi` scheme for Android 11+. iPhone and computers show a QR code plus the UPI ID with Copy.
-- **Live updates**: database triggers send a small "something changed" message on a private Realtime channel per group. Only members can listen. Every open screen re-reads its data straight away.
-- **Offline**: everything loaded is cached on the device for a week. Expenses added, edited or deleted offline go into a queue in device storage that survives closing the app, and sync on reconnect. If two people edited the same expense, the last save wins and the app says so.
-- **Emails and reminders**: every in-app notification also triggers an email through pg_net and the `send-email` function (authenticated with a secret in Supabase Vault). pg_cron runs `reminders` at 09:00 IST: people who have owed someone money for more than 3 days get a reminder (daily, weekly or off, per person), and anyone who hasn't answered a payment claim for 3 days gets one nudge.
-- **Bill scan**: the phone shrinks the photo under 1 MB and uploads it to a private bucket. The `scan-bill` function checks membership, file type (by its first bytes) and size, reads it with OCR.space, and parses items, tax, service charge, discount and total. If reading fails, the same screen opens empty for typing.
+- **Money** is integer paise everywhere (database `bigint`, app `number`). Rupees exist only in formatting (`₹1,23,456.78`) and the UPI link.
+- **Splits** (equal, exact, percentage, shares) are computed by the same rules in the app (live preview, [src/core/splits.ts](src/core/splits.ts)) and in the database (`public.compute_splits`), which is the source of truth. Rounding remainders go to the payer. A commit-time constraint trigger rejects any expense whose splits do not add up to its total.
+- **Balances** are computed on the server (`public.group_nets`). The "who pays whom" list is the minimum number of payments: an exact subset search for groups of up to 16 people with a balance, greedy matching beyond that ([src/core/simplify.ts](src/core/simplify.ts)).
+- **Authorisation** is enforced in the database. Every table has row-level security keyed on group membership. Every write goes through a `security definer` function that checks the caller (admin-only actions, only the payer can mark paid, only the receiver can confirm). Internal helper functions cannot be called by app users.
+- **UPI settlement:** the payer starts a settlement (`pending`), pays in their own UPI app through a `upi://pay` link (Android) or a QR code (iPhone and web), then marks it paid (`marked_paid`). The receiver confirms (`completed`, the debt clears) or declines (`declined`, the debt stays). Cash works the same way.
+- **Reminders:** pg_cron calls the `reminders` edge function every day at 09:00 IST. It reminds anyone who has owed money in a group for more than 3 days, following their daily, weekly or off setting, and nudges receivers who have left a payment claim unanswered for 3 days.
+- **Offline:** server data is cached on the device for a week, so groups, expenses and balances stay readable offline. New, edited and deleted expenses go into a queue in device storage that survives a force-close, and the queue syncs on reconnect. The server applies last-write-wins and tells the app when it overwrote someone else's edit, and the app shows that notice. Settling up needs a connection.
+- **Invites:** adding a phone number or email that is not on SplitIt creates an invite. Email invites are sent automatically; phone invites get a link to share on WhatsApp or SMS. Signing up from the link (or with that phone or email) joins the group automatically.
 
 ## Repository layout
 
 ```
 src/app/            screens (Expo Router)
-src/core/           shared logic: money, splits, fewest payments, UPI link, bill parser, dates, phone numbers
-src/lib/            data loading, offline queue, live updates, login, theme
-src/components/     buttons, inputs, date picker, offline banner
-supabase/migrations database: tables, security rules, functions, live updates, storage, scheduled job
-supabase/functions  server functions: signup, login, password-reset, send-email, scan-bill, reminders
-supabase/seed.sql   demo data      supabase/clear-demo.sql removes it
-tests/              unit tests, live backend security test, end-to-end browser test
-.github/workflows   checks, Android APK, website, backend deploy
+src/core/           pure logic shared by app and server: money, splits, simplify, UPI link, bill text parser
+src/lib/            API, offline queue, auth, query cache
+supabase/migrations database schema, security, functions, cron job
+supabase/functions  edge functions: signup, login, scan-bill, notify-email, reminders
+supabase/seed.sql   demo data
+supabase/tests      authorisation and arithmetic checks (SQL)
+tests/              unit tests (vitest) and the end-to-end browser test
+.github/workflows   CI, backend deploy, Android APK, web deploy
 ```
 
-## Run and test
+## Run locally
 
 ```bash
 npm ci
 ```
 
 ```bash
+cp .env.example .env
+```
+
+```bash
 npx expo start
 ```
 
-Unit tests (money, splits with thousands of random cases, fewest payments against brute force, UPI link, bill parsing, offline queue):
+Press `a` for an Android emulator, scan the QR code with Expo Go on a phone, or press `w` for the browser.
+
+Checks:
+
+```bash
+npx tsc --noEmit
+```
 
 ```bash
 npx vitest run
 ```
 
-Live backend security and arithmetic test (63 checks; creates throwaway `e2e-…@example.com` users, removed by `scripts/clear-test-users.sql`):
+End-to-end test against the live backend (creates and needs cleanup of a throwaway user and group):
 
 ```bash
-NODE_USE_ENV_PROXY=1 node tests/api/backend.mjs
+npx expo export -p web --output-dir dist && node tests/e2e/serve.js "$PWD/dist" & node tests/e2e/flows.js /tmp
 ```
 
-End-to-end browser test of the main flows against the live backend (32 steps):
+Authorisation tests: run [supabase/tests/authorization.sql](supabase/tests/authorization.sql) in the Supabase SQL editor on a seeded database. Every row should show `pass = true`.
 
-```bash
-npx expo export -p web --output-dir dist && (node tests/e2e/serve.mjs dist 8099 &) && node tests/e2e/flows.cjs /tmp
-```
+## Set up your own backend
 
-## Setting up your own copy
-
-See [docs/SETUP.md](docs/SETUP.md) for every account and key, where to get it and where to put it. In short:
-
-1. Create a Supabase project and apply `supabase/migrations` (`supabase db push`).
-2. In the SQL Editor, create the two Vault secrets the database uses to call the server functions:
+1. Create a Supabase project. Apply the migrations in `supabase/migrations` in order (`supabase db push`), then run `supabase/seed.sql` for demo data.
+2. In the SQL editor, create the two Vault secrets the database hooks use:
    ```sql
    select vault.create_secret('https://<project-ref>.supabase.co', 'project_url');
    select vault.create_secret(encode(extensions.gen_random_bytes(32), 'hex'), 'hook_secret');
    ```
-3. `supabase functions deploy` and add the Edge Function secrets `RESEND_API_KEY` (plus optional `RESEND_FROM`, `OCR_SPACE_API_KEY`, `SENTRY_DSN`, `APP_URL`).
-4. Put the project URL and publishable key in `src/lib/config.ts` (or `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_KEY`).
+3. Deploy the functions: `supabase functions deploy` (settings in `supabase/config.toml`).
+4. Edge Function secrets (Dashboard → Edge Functions → Secrets):
+   - `RESEND_API_KEY`: email. Without a verified domain, Resend only delivers to your own address.
+   - `RESEND_FROM` (optional), for example `SplitIt <hello@yourdomain.com>` once the domain is verified.
+   - `OCR_SPACE_API_KEY`: bill reading. Free key from ocr.space/ocrapi. Without it, Scan bill falls back to manual entry.
+   - `SENTRY_DSN` (optional): server-side error reports.
+   - `APP_URL` (optional): where email links point. Defaults to the GitHub Pages URL.
+5. Authentication settings (Dashboard → Authentication):
+   - **URL Configuration:** Site URL `https://shriharshagithub.github.io/splitit-claude`; add redirect URLs `https://shriharshagithub.github.io/splitit-claude/**` and `splitit://**`.
+   - **Emails → SMTP settings:** host `smtp.resend.com`, port `465`, user `resend`, password = your Resend API key. Without this, password-reset emails use Supabase's test mailer, which only sends a few emails an hour.
+   - **Providers → Google (optional):** add the Google OAuth client ID and secret.
+6. Put your project URL and publishable key in `.env` and in the two app workflows.
+
+## Automated deployment
+
+| Workflow | Runs on | Needs |
+| --- | --- | --- |
+| CI | every push and PR | nothing |
+| Deploy backend | push to `main` touching `supabase/` | repository secrets `SUPABASE_ACCESS_TOKEN` (Supabase → Account → Access tokens) and `SUPABASE_DB_PASSWORD` |
+| Android APK | every push | nothing. Optional repository variable `SENTRY_DSN` |
+| Web app | every push | Settings → Pages → Source: **GitHub Actions**. Optional variable `SENTRY_DSN` |
 
 ## Known limits
 
-- Mobile numbers are not verified by SMS (that needs a paid SMS provider).
-- No push notifications (needs Firebase); in-app messages and email cover every case.
-- The APK is signed with a debug key: fine for installing directly, not for the Play Store.
-- No iPhone app build (needs a paid Apple developer account); iPhones use the website.
-- The website needs a connection the first time it opens; after that it keeps working through a dropped connection.
-- The backend is in Sydney (the region the project was created in), so each save takes about a second from India. A new project in Mumbai would be faster.
+- Phone numbers are a login identifier but are not verified by OTP; that needs a paid SMS provider. Phone login goes through the `login` edge function, which looks up the account and signs in with its email and password, because Supabase's built-in phone login requires SMS.
+- The APK is signed with the debug key, which is fine for side-loading and testing. Play Store release needs a proper keystore.
+- Push notifications are not set up. In-app notifications and email cover payment requests, claims and reminders.
+- OCR.space's free tier reads images up to 1 MB. The app shrinks photos before upload, and larger files fall back to manual entry.
+- The web version does not work offline from a cold start (there is no service worker), though it stays usable if the connection drops while it is open. The native app works fully offline.

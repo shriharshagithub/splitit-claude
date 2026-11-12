@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Add expense</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anek+Latin:wght@600;700&family=JetBrains+Mono:wght@500;600&family=Mukta:wght@400;500;600&display=swap">
+<style>
+body{margin:0}
+a{color:#2b2f8f}a:hover{color:#15163a}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #f5f5fb; color: #15163a; font-family: Mukta, 'Noto Sans', system-ui, sans-serif; display: flex; flex-direction: column; overflow: hidden">
+  <div style="display: flex; align-items: center; gap: 4px; padding: 16px 8px 4px">
+    <a href="GroupExpenses.dc.html" aria-label="Close" style="width: 48px; height: 48px; display: flex; align-items: center; justify-content: center">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#15163a" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+    </a>
+    <div style="display: flex; flex-direction: column">
+      <h1 style="margin: 0; font-family: 'Anek Latin', system-ui, sans-serif; font-size: 22px; line-height: 28px; font-weight: 600">Add expense</h1>
+      <span style="font-size: 13px; line-height: 18px; color: #54567a">Goa Trip</span>
+    </div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 12px; padding: 4px 16px 0">
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+      <div style="display: flex; flex-direction: column; gap: 4px">
+        <label for="amt" style="font-size: 14px; line-height: 20px; font-weight: 500">Amount</label>
+        <input id="amt" inputmode="decimal" value="₹4,250.00" style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 20px; line-height: 28px; font-weight: 600; color: #15163a; background: #ffffff; border: 1px solid #84869f; border-radius: 8px; min-height: 48px; padding: 0 12px; box-sizing: border-box; min-width: 0">
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 4px">
+        <label for="paid" style="font-size: 14px; line-height: 20px; font-weight: 500">Paid by</label>
+        <button id="paid" style="min-height: 48px; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; background: #ffffff; border: 1px solid #84869f; border-radius: 8px; font-family: Mukta, sans-serif; font-size: 16px; line-height: 24px; color: #15163a">Ravi<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#54567a" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></button>
+      </div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 4px">
+      <label for="desc" style="font-size: 14px; line-height: 20px; font-weight: 500">Description</label>
+      <input id="desc" value="Dinner at Fisherman's Wharf" style="font-family: Mukta, sans-serif; font-size: 16px; line-height: 24px; color: #15163a; background: #ffffff; border: 1px solid #84869f; border-radius: 8px; min-height: 48px; padding: 0 12px; box-sizing: border-box">
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+      <div style="display: flex; flex-direction: column; gap: 4px">
+        <label for="cat" style="font-size: 14px; line-height: 20px; font-weight: 500">Category</label>
+        <button id="cat" style="min-height: 48px; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; background: #ffffff; border: 1px solid #84869f; border-radius: 8px; font-family: Mukta, sans-serif; font-size: 16px; line-height: 24px; color: #15163a">Food and drink<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#54567a" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></button>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 4px">
+        <label for="date" style="font-size: 14px; line-height: 20px; font-weight: 500">Date</label>
+        <button id="date" style="min-height: 48px; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; background: #ffffff; border: 1px solid #84869f; border-radius: 8px; font-family: Mukta, sans-serif; font-size: 16px; line-height: 24px; color: #15163a">12 Nov 2026<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#54567a" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M16 3v4M8 3v4M3 10h18"></path></svg></button>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 4px">
+      <span id="splitlbl" style="font-size: 14px; line-height: 20px; font-weight: 500">Split</span>
+      <div role="group" aria-labelledby="splitlbl" style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; background: #e9eaf4; padding: 4px; border-radius: 14px">
+        <sc-for list="{{methods}}" as="m" hint-placeholder-count="4">
+          <button aria-pressed="{{m.pressed}}" onClick="{{m.pick}}" style="{{m.style}}">{{m.label}}</button>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="background: #ffffff; border: 1px solid #d6d7e6; border-radius: 14px; overflow: hidden">
+      <sc-for list="{{rows}}" as="r" hint-placeholder-count="5">
+        <div style="{{r.rowStyle}}">
+          <span style="width: 32px; height: 32px; flex: none; border-radius: 999px; background: #e4e5f8; color: #2b2f8f; font-size: 13px; line-height: 32px; font-weight: 600; text-align: center">{{r.initials}}</span>
+          <span style="flex: 1; min-width: 0; font-size: 16px; line-height: 24px">{{r.name}}</span>
+          <sc-if value="{{r.isShares}}" hint-placeholder-val="{{ false }}">
+            <span style="display: flex; align-items: center; gap: 4px">
+              <button aria-label="{{r.decLabel}}" onClick="{{r.dec}}" style="width: 32px; height: 32px; border-radius: 999px; border: 1px solid #84869f; background: #ffffff; color: #2b2f8f; font-family: Mukta, sans-serif; font-size: 18px; line-height: 18px; cursor: pointer">−</button>
+              <span style="width: 24px; text-align: center; font-family: 'JetBrains Mono', monospace; font-size: 14px">{{r.shares}}</span>
+              <button aria-label="{{r.incLabel}}" onClick="{{r.inc}}" style="width: 32px; height: 32px; border-radius: 999px; border: 1px solid #84869f; background: #ffffff; color: #2b2f8f; font-family: Mukta, sans-serif; font-size: 18px; line-height: 18px; cursor: pointer">+</button>
+            </span>
+          </sc-if>
+          <sc-if value="{{r.showInput}}" hint-placeholder-val="{{ false }}">
+            <span style="min-width: 72px; text-align: right; padding: 4px 8px; border: 1px solid #84869f; border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 14px; line-height: 20px; white-space: nowrap">{{r.input}}</span>
+          </sc-if>
+          <span style="{{r.amtStyle}}">{{r.amount}}</span>
+        </div>
+      </sc-for>
+    </div>
+    <div role="status" style="{{statusStyle}}">{{status}}</div>
+  </div>
+
+  <div style="flex: 1"></div>
+  <div style="padding: 12px 16px 32px; border-top: 1px solid #d6d7e6">
+    <button disabled="{{invalid}}" style="{{saveStyle}}">Save expense</button>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { method: 'shares', shares: [1, 2, 1, 1, 0] };
+  }
+  fmt(p) {
+    var r = String(Math.floor(p / 100)), d = String(p % 100).padStart(2, '0');
+    var last = r.slice(-3), rest = r.slice(0, -3);
+    if (rest) last = rest.replace(/\B(?=(\d{2})+(?!\d))/g, ',') + ',' + last;
+    return '₹' + last + '.' + d;
+  }
+  renderVals() {
+    var self = this, total = 425000, payer = 1;
+    var people = [['You', 'PS'], ['Ravi', 'RK'], ['Ananya', 'AI'], ['Arjun', 'AM'], ['Meera', 'MN']];
+    var m = this.state.method, sh = this.state.shares, amounts, inputs;
+    if (m === 'equal') {
+      amounts = people.map(function () { return Math.floor(total / 5); });
+      inputs = people.map(function () { return ''; });
+    } else if (m === 'exact') {
+      amounts = [100000, 125000, 80000, 80000, 30000];
+      inputs = amounts.map(function (a) { return self.fmt(a); });
+    } else if (m === 'percent') {
+      var pc = [20, 30, 20, 20, 10];
+      amounts = pc.map(function (p) { return Math.floor(total * p / 100); });
+      inputs = pc.map(function (p) { return p + '%'; });
+    } else {
+      var S = sh.reduce(function (a, b) { return a + b; }, 0);
+      amounts = sh.map(function (s) { return S ? Math.floor(total * s / S) : 0; });
+      inputs = sh.map(String);
+    }
+    if (m !== 'exact') {
+      var sum0 = amounts.reduce(function (a, b) { return a + b; }, 0);
+      amounts[payer] += total - sum0;
+    }
+    var sum = amounts.reduce(function (a, b) { return a + b; }, 0);
+    var diff = total - sum, invalid = diff !== 0;
+    var seg = 'min-height: 40px; border: 0; border-radius: 8px; font-family: Mukta, sans-serif; font-size: 14px; line-height: 20px; font-weight: 500; cursor: pointer; ';
+    var methods = [['equal', 'Equal'], ['exact', 'Exact'], ['percent', 'Percent'], ['shares', 'Shares']].map(function (x) {
+      var on = x[0] === m;
+      return { label: x[1], pressed: on ? 'true' : 'false',
+        style: seg + (on ? 'background: #ffffff; color: #15163a; box-shadow: 0 0 0 1px #d6d7e6' : 'background: transparent; color: #54567a'),
+        pick: function () { self.setState({ method: x[0] }); } };
+    });
+    var rows = people.map(function (p, i) {
+      return {
+        name: p[0], initials: p[1], shares: sh[i], input: inputs[i],
+        isShares: m === 'shares', showInput: m === 'exact' || m === 'percent',
+        incLabel: 'One more share for ' + p[0], decLabel: 'One less share for ' + p[0],
+        inc: function () { var n = sh.slice(); n[i] += 1; self.setState({ shares: n }); },
+        dec: function () { var n = sh.slice(); n[i] = Math.max(0, n[i] - 1); self.setState({ shares: n }); },
+        amount: amounts[i] ? self.fmt(amounts[i]) : 'not in split',
+        amtStyle: 'width: 96px; flex: none; text-align: right; white-space: nowrap; ' + (amounts[i] ? "font-family: 'JetBrains Mono', monospace; font-size: 15px; line-height: 24px; font-weight: 500; color: #15163a" : 'font-size: 13px; line-height: 18px; color: #54567a'),
+        rowStyle: 'display: flex; align-items: center; gap: 8px; padding: 8px 12px; min-height: 48px; box-sizing: border-box' + (i ? '; border-top: 1px solid #d6d7e6' : '')
+      };
+    });
+    var status = invalid
+      ? 'Splits add up to ' + this.fmt(sum) + '. ' + (diff > 0 ? 'Add ' + this.fmt(diff) + ' more' : 'Remove ' + this.fmt(-diff)) + ' to match the total.'
+      : 'Splits add up to ' + this.fmt(total) + '. Any leftover paisa goes to Ravi, who paid.';
+    return {
+      methods: methods, rows: rows, status: status, invalid: invalid,
+      statusStyle: 'font-size: 13px; line-height: 18px; color: ' + (invalid ? '#a8123a' : '#54567a'),
+      saveStyle: 'width: 100%; min-height: 48px; border-radius: 14px; border: 0; font-family: Mukta, sans-serif; font-size: 16px; line-height: 24px; font-weight: 600; ' + (invalid ? 'background: #e9eaf4; color: #54567a' : 'background: #2b2f8f; color: #ffffff; cursor: pointer')
+    };
+  }
+}
+</script>
+</body>
+</html>

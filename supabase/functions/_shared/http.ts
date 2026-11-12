@@ -8,11 +8,9 @@ export function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
 }
 
-/** A message safe to show a person, plus an HTTP status. Anything else is reported as a generic error. */
+/** A failure the user can act on. The message is shown in the app as-is. */
 export class UserError extends Error {
-  constructor(message: string, public status = 400) { super(message); }
-}
-
-export function appUrl(): string {
-  return (Deno.env.get('APP_URL') || 'https://shriharshagithub.github.io/splitit-claude').replace(/\/+$/, '');
+  constructor(message: string, public status = 400) {
+    super(message);
+  }
 }
